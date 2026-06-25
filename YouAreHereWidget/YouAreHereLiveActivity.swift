@@ -1,0 +1,101 @@
+import ActivityKit
+import WidgetKit
+import SwiftUI
+
+/// The Live Activity: full layout on the Lock Screen / StandBy, and a compact
+/// presentation in the Dynamic Island. Uses the shared `WayfindingView` so the
+/// lock screen matches the in-app screen exactly.
+struct YouAreHereLiveActivity: Widget {
+    var body: some WidgetConfiguration {
+        ActivityConfiguration(for: LocationActivityAttributes.self) { context in
+            // Lock Screen / banner presentation.
+            WayfindingView(state: context.state, townSize: 40, alignment: .leading)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Theme.background)
+                .activityBackgroundTint(Theme.background)
+                .activitySystemActionForegroundColor(Theme.primary)
+
+        } dynamicIsland: { context in
+            DynamicIsland {
+                // Expanded
+                DynamicIslandExpandedRegion(.leading) {
+                    if let route = context.state.route {
+                        RouteShield(route: route, height: 26)
+                            .padding(.leading, 4)
+                    } else {
+                        Image(systemName: "road.lanes")
+                            .foregroundColor(Theme.secondary)
+                    }
+                }
+                DynamicIslandExpandedRegion(.trailing) {
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(Formatting.altitudeString(meters: context.state.altitudeMeters,
+                                                       metric: context.state.unitIsMetric))
+                            .font(Theme.font(size: 13, weight: .medium))
+                            .foregroundColor(Theme.secondary)
+                        Text(Formatting.headingString(context.state.headingDegrees))
+                            .font(Theme.font(size: 13, weight: .medium))
+                            .foregroundColor(Theme.textColor(changed: context.state.headingChanged, base: Theme.secondary))
+                    }
+                }
+                DynamicIslandExpandedRegion(.center) {
+                    Text(displayTown(context.state))
+                        .font(Theme.font(size: 22, weight: .bold))
+                        .foregroundColor(Theme.textColor(changed: context.state.townChanged, base: Theme.primary))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                }
+                DynamicIslandExpandedRegion(.bottom) {
+                    HStack(spacing: 6) {
+                        Text(roadText(context.state))
+                            .font(Theme.font(size: 13, weight: .medium))
+                            .foregroundColor(Theme.textColor(changed: context.state.roadChanged, base: Theme.secondary))
+                            .lineLimit(1)
+                        if !context.state.hasSignal {
+                            Image(systemName: "wifi.slash").foregroundColor(Theme.muted).font(.system(size: 11))
+                        }
+                        Spacer()
+                    }
+                }
+            } compactLeading: {
+                if let route = context.state.route {
+                    RouteShield(route: route, height: 20)
+                } else {
+                    Image(systemName: "location.fill").foregroundColor(Theme.primary)
+                }
+            } compactTrailing: {
+                Text(shortTown(context.state))
+                    .font(Theme.font(size: 14, weight: .bold))
+                    .foregroundColor(Theme.textColor(changed: context.state.townChanged, base: Theme.primary))
+                    .lineLimit(1)
+                    .frame(maxWidth: 80)
+            } minimal: {
+                Image(systemName: "location.north.line.fill")
+                    .rotationEffect(.degrees(context.state.headingDegrees ?? 0))
+                    .foregroundColor(Theme.primary)
+            }
+            .widgetURL(URL(string: "youarehere://open"))
+            .keylineTint(Theme.primary)
+        }
+    }
+
+    private func displayTown(_ s: LocationActivityAttributes.ContentState) -> String {
+        s.town.isEmpty ? (s.hasSignal ? "Locating…" : "No signal") : s.town
+    }
+
+    private func shortTown(_ s: LocationActivityAttributes.ContentState) -> String {
+        s.town.isEmpty ? "—" : s.town
+    }
+
+    private func roadText(_ s: LocationActivityAttributes.ContentState) -> String {
+        if let route = s.route {
+            if RouteParser.roadIsJustRoute(road: s.road, route: route) || s.road.isEmpty {
+                return Formatting.routeLabel(route)
+            }
+            return "\(s.road) · \(Formatting.routeLabel(route))"
+        }
+        return s.road.isEmpty ? "—" : s.road
+    }
+}
