@@ -36,6 +36,8 @@ struct LocationActivityAttributes: ActivityAttributes {
         var unitIsMetric: Bool
         /// False when we have no network and names are stale.
         var hasSignal: Bool
+        /// True when "parked" — sensors are frozen to save battery.
+        var isPaused: Bool
 
         // MARK: Flash flags
         // Set `true` on the single update where the field just changed, so the
@@ -53,6 +55,7 @@ struct LocationActivityAttributes: ActivityAttributes {
                 headingDegrees: 305,
                 unitIsMetric: false,
                 hasSignal: true,
+                isPaused: false,
                 townChanged: false,
                 roadChanged: false,
                 headingChanged: false

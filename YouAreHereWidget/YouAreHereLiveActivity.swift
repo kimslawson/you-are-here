@@ -1,6 +1,7 @@
 import ActivityKit
 import WidgetKit
 import SwiftUI
+import AppIntents
 
 /// The Live Activity: full layout on the Lock Screen / StandBy, and a compact
 /// presentation in the Dynamic Island. Uses the shared `WayfindingView` so the
@@ -9,7 +10,9 @@ struct YouAreHereLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: LocationActivityAttributes.self) { context in
             // Lock Screen / banner presentation.
-            WayfindingView(state: context.state, townSize: 40, alignment: .leading)
+            WayfindingView(state: context.state, townSize: 40, alignment: .leading) {
+                pauseControl(isPaused: context.state.isPaused, size: 22)
+            }
                 .padding(.horizontal, 18)
                 .padding(.vertical, 14)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -57,6 +60,7 @@ struct YouAreHereLiveActivity: Widget {
                             Image(systemName: "wifi.slash").foregroundColor(Theme.muted).font(.system(size: 11))
                         }
                         Spacer()
+                        pauseControl(isPaused: context.state.isPaused, size: 22)
                     }
                 }
             } compactLeading: {
@@ -78,6 +82,20 @@ struct YouAreHereLiveActivity: Widget {
             }
             .widgetURL(URL(string: "youarehere://open"))
             .keylineTint(Theme.primary)
+        }
+    }
+
+    /// Park/resume control. Interactive via an App Intent on iOS 17+; on older
+    /// systems it's a non-interactive glyph (tapping the activity opens the app).
+    @ViewBuilder
+    private func pauseControl(isPaused: Bool, size: CGFloat) -> some View {
+        if #available(iOS 17.0, *) {
+            Button(intent: TogglePauseIntent()) {
+                PauseGlyph(isPaused: isPaused, size: size)
+            }
+            .buttonStyle(.plain)
+        } else {
+            PauseGlyph(isPaused: isPaused, size: size)
         }
     }
 

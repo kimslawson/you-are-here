@@ -4,6 +4,7 @@ import Foundation
 enum SettingsKey {
     static let unitIsMetric = "unitIsMetric"
     static let liveActivityEnabled = "liveActivityEnabled"
+    static let isPaused = "isPaused"
 }
 
 extension UserDefaults {

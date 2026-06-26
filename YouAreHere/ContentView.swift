@@ -18,10 +18,17 @@ struct ContentView: View {
                 GeometryReader { geo in
                     WayfindingView(state: engine.state,
                                    townSize: townSize(for: geo.size),
-                                   alignment: .leading)
-                        .padding(.horizontal, 28)
-                        .frame(width: geo.size.width, height: geo.size.height, alignment: .leading)
-                        .animation(.easeOut(duration: 0.25), value: engine.state)
+                                   alignment: .leading) {
+                        Button {
+                            engine.togglePause()
+                        } label: {
+                            PauseGlyph(isPaused: engine.isPaused, size: townSize(for: geo.size) * 0.32)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.horizontal, 28)
+                    .frame(width: geo.size.width, height: geo.size.height, alignment: .leading)
+                    .animation(.easeOut(duration: 0.25), value: engine.state)
                 }
             }
 
@@ -42,9 +49,13 @@ struct ContentView: View {
             }
         }
         .onAppear {
-            UIApplication.shared.isIdleTimerDisabled = true   // keep awake on the dash
+            // Keep awake on the dash while live; allow sleep when parked.
+            UIApplication.shared.isIdleTimerDisabled = !engine.isPaused
             engine.requestAuthorization()
             engine.start()
+        }
+        .onChange(of: engine.isPaused) { paused in
+            UIApplication.shared.isIdleTimerDisabled = !paused
         }
         .onDisappear {
             UIApplication.shared.isIdleTimerDisabled = false

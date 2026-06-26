@@ -35,6 +35,13 @@ When the **town, road, or compass direction changes**, that field briefly
 - **Compass:** true north (falls back to magnetic if true north is unavailable).
 - **Altitude:** GPS (absolute) fused with the barometer (smooth, responsive) —
   see `AltitudeFuser.swift`.
+- **Parked mode:** a pause/play button at the trailing end of the
+  altitude/heading line (both on screen and in the Live Activity). Parking
+  freezes the readout and powers down the sensors to save battery; the screen is
+  also allowed to sleep. It stays parked until you tap play (manual resume).
+  The Live Activity button is interactive on iOS 17+ (via an App Intent that
+  runs in the app process and relaunches it if needed); on iOS 16 it shows the
+  state but tapping opens the app instead.
 
 ## How it updates
 

@@ -11,13 +11,19 @@ import UIKit
 @MainActor
 final class LocationEngine: NSObject, ObservableObject {
 
+    /// Shared instance so the Live Activity's pause intent (which runs in the
+    /// app process) can reach the live engine.
+    static let shared = LocationEngine()
+
     // MARK: Published state for the on-screen app
     @Published private(set) var state = LocationActivityAttributes.ContentState(
         town: "", road: "", route: nil, altitudeMeters: nil, headingDegrees: nil,
-        unitIsMetric: false, hasSignal: true,
+        unitIsMetric: false, hasSignal: true, isPaused: false,
         townChanged: false, roadChanged: false, headingChanged: false)
     @Published private(set) var authorization: CLAuthorizationStatus = .notDetermined
     @Published private(set) var isRunning = false
+    /// "Parked": sensors frozen to save battery. Persisted across launches.
+    @Published private(set) var isPaused = false
 
     // MARK: Collaborators
     private let manager = CLLocationManager()
@@ -76,12 +82,16 @@ final class LocationEngine: NSObject, ObservableObject {
         manager.headingFilter = 1   // degrees
         manager.headingOrientation = .portrait
         authorization = manager.authorizationStatus
+        isPaused = UserDefaults.standard.bool(forKey: SettingsKey.isPaused)
         updateHeadingOrientation()
 
         pathMonitor.pathUpdateHandler = { [weak self] path in
             Task { @MainActor in self?.networkAvailable = (path.status == .satisfied) }
         }
         pathMonitor.start(queue: DispatchQueue.global(qos: .utility))
+
+        // Let the Live Activity's pause button reach us.
+        LiveActivityActions.togglePause = { [weak self] in self?.togglePause() }
     }
 
     deinit {
@@ -114,6 +124,51 @@ final class LocationEngine: NSObject, ObservableObject {
             break
         }
 
+        startLiveActivity()
+
+        // Honor a persisted parked state across launches: don't power up the
+        // sensors, just show the frozen Live Activity.
+        if isPaused {
+            pushFrozenState()
+        } else {
+            startSensors()
+        }
+    }
+
+    func stop() {
+        guard isRunning else { return }
+        isRunning = false
+        suspendSensors()
+        endLiveActivity()
+    }
+
+    // MARK: Park / resume
+
+    func togglePause() {
+        setPaused(!isPaused)
+    }
+
+    func setPaused(_ paused: Bool) {
+        guard paused != isPaused else { return }
+        isPaused = paused
+        UserDefaults.standard.set(paused, forKey: SettingsKey.isPaused)
+
+        if paused {
+            suspendSensors()
+            pushFrozenState()           // freeze the readout, flip icon to play
+        } else {
+            if !isRunning {
+                start()                 // resume even if we were relaunched cold
+            } else {
+                startSensors()
+            }
+            pushFrozenState()           // immediately flip icon to pause
+        }
+    }
+
+    // MARK: Sensor lifecycle
+
+    private func startSensors() {
         if manager.authorizationStatus == .authorizedAlways
             || manager.authorizationStatus == .authorizedWhenInUse {
             manager.allowsBackgroundLocationUpdates = true
@@ -128,24 +183,24 @@ final class LocationEngine: NSObject, ObservableObject {
         // compass reads the same physical direction in portrait and landscape.
         UIDevice.current.beginGeneratingDeviceOrientationNotifications()
         updateHeadingOrientation()
-        orientationObserver = NotificationCenter.default.addObserver(
-            forName: UIDevice.orientationDidChangeNotification, object: nil, queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in self?.updateHeadingOrientation() }
+        if orientationObserver == nil {
+            orientationObserver = NotificationCenter.default.addObserver(
+                forName: UIDevice.orientationDidChangeNotification, object: nil, queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor in self?.updateHeadingOrientation() }
+            }
         }
 
+        tickTimer?.invalidate()
         tickTimer = Timer.scheduledTimer(withTimeInterval: tickInterval, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.tick(force: false) }
         }
-
-        startLiveActivity()
     }
 
-    func stop() {
-        guard isRunning else { return }
-        isRunning = false
+    private func suspendSensors() {
         manager.stopUpdatingLocation()
         manager.stopUpdatingHeading()
+        manager.allowsBackgroundLocationUpdates = false
         fuser.stop()
         tickTimer?.invalidate()
         tickTimer = nil
@@ -154,7 +209,6 @@ final class LocationEngine: NSObject, ObservableObject {
             self.orientationObserver = nil
         }
         UIDevice.current.endGeneratingDeviceOrientationNotifications()
-        endLiveActivity()
     }
 
     /// Map the physical device orientation onto CoreLocation's heading reference.
@@ -177,6 +231,7 @@ final class LocationEngine: NSObject, ObservableObject {
     // MARK: Tick
 
     private func tick(force: Bool) {
+        guard !isPaused else { return }
         let now = Date()
         guard force || now.timeIntervalSince(lastTick) >= tickInterval - 0.05 else { return }
         lastTick = now
@@ -202,7 +257,7 @@ final class LocationEngine: NSObject, ObservableObject {
         let newState = LocationActivityAttributes.ContentState(
             town: town, road: road, route: route,
             altitudeMeters: altitude, headingDegrees: heading,
-            unitIsMetric: metric, hasSignal: networkAvailable,
+            unitIsMetric: metric, hasSignal: networkAvailable, isPaused: false,
             townChanged: townChanged, roadChanged: roadChanged, headingChanged: headingChanged)
 
         state = newState
@@ -214,6 +269,22 @@ final class LocationEngine: NSObject, ObservableObject {
         if let cardinal { lastCardinal = cardinal }
 
         pushActivityIfNeeded(newState, important: townChanged || roadChanged || headingChanged)
+    }
+
+    /// Push the current (frozen) readout with the latest `isPaused`, clearing
+    /// flash flags. Used when parking/resuming so the Live Activity and on-screen
+    /// UI flip the pause/play icon immediately without waiting for a tick.
+    private func pushFrozenState() {
+        var s = state
+        s.isPaused = isPaused
+        s.townChanged = false
+        s.roadChanged = false
+        s.headingChanged = false
+        state = s
+
+        guard let activity else { return }
+        let content = ActivityContent(state: s, staleDate: nil)
+        Task { await activity.update(content) }
     }
 
     // MARK: Geocoding
@@ -256,8 +327,19 @@ final class LocationEngine: NSObject, ObservableObject {
     private func startLiveActivity() {
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
         guard activity == nil else { return }
+
+        // If we were relaunched (e.g. cold-started by the pause intent), reconnect
+        // to the Activity the system is already showing instead of making a new one.
+        if let existing = Activity<LocationActivityAttributes>.activities.first {
+            activity = existing
+            return
+        }
+
+        var initial = state
+        initial.isPaused = isPaused
         let attributes = LocationActivityAttributes(title: "You Are Here")
-        let content = ActivityContent(state: state, staleDate: Date().addingTimeInterval(30))
+        let staleDate: Date? = isPaused ? nil : Date().addingTimeInterval(30)
+        let content = ActivityContent(state: initial, staleDate: staleDate)
         do {
             activity = try Activity.request(attributes: attributes, content: content, pushType: nil)
         } catch {

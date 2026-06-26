@@ -6,11 +6,14 @@ import SwiftUI
 ///   line 1 (small): road name  ·  [shield] route name
 ///   line 2 (BIG):   town name
 ///   line 3 (small): altitude   ·   heading
-struct WayfindingView: View {
+struct WayfindingView<Trailing: View>: View {
     let state: LocationActivityAttributes.ContentState
     /// Base point size for the big town line. Small lines scale from this.
     var townSize: CGFloat = 64
     var alignment: HorizontalAlignment = .leading
+    /// Optional control pinned to the trailing end of the altitude/heading line
+    /// (e.g. the park/resume button).
+    @ViewBuilder var trailing: () -> Trailing
 
     private var smallSize: CGFloat { max(12, townSize * 0.27) }
     private var shieldHeight: CGFloat { max(16, townSize * 0.34) }
@@ -108,9 +111,19 @@ struct WayfindingView: View {
                     .foregroundColor(Theme.muted)
             }
             Spacer(minLength: 0)
+            trailing()
         }
         .lineLimit(1)
         .minimumScaleFactor(0.6)
+    }
+}
+
+// Convenience initializer for callers that don't need a trailing control.
+extension WayfindingView where Trailing == EmptyView {
+    init(state: LocationActivityAttributes.ContentState,
+         townSize: CGFloat = 64,
+         alignment: HorizontalAlignment = .leading) {
+        self.init(state: state, townSize: townSize, alignment: alignment, trailing: { EmptyView() })
     }
 }
 
