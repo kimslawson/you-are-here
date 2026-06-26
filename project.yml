@@ -49,3 +49,23 @@ targets:
         INFOPLIST_FILE: YouAreHereWidget/Info.plist
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         TARGETED_DEVICE_FAMILY: "1"
+
+# An explicit shared scheme that builds the app (which embeds the widget via its
+# dependency) and runs the APP — not the widget extension. Without this, Xcode
+# auto-creates a scheme per target and selecting the widget's scheme makes Run
+# try (and fail) to "show" the extension instead of launching the app.
+schemes:
+  YouAreHere:
+    build:
+      targets:
+        YouAreHere: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
