@@ -32,6 +32,11 @@ When the **town, road, or compass direction changes**, that field briefly
 - **Palette:** bright off-white text on true black for contrast and OLED
   comfort; pure white for the change-flash. Centralized in `Shared/Theme.swift`.
 - **Units:** Imperial by default, with an in-app Imperial/Metric toggle.
+- **Update rate:** 1s (default) / 2s / 5s / 10s. This isn't just a UI cadence —
+  it's a power profile: slower rates also relax GPS accuracy and the
+  distance/heading filters so the receiver powers down between fixes (the real
+  battery/heat lever). 1s–2s stay at full accuracy; 5s–10s trade some altitude
+  and town/road precision for battery. See `RefreshRate` in `Settings.swift`.
 - **Compass:** true north (falls back to magnetic if true north is unavailable).
 - **Altitude:** GPS (absolute) fused with the barometer (smooth, responsive) —
   see `AltitudeFuser.swift`.

@@ -61,7 +61,9 @@ struct ContentView: View {
             UIApplication.shared.isIdleTimerDisabled = false
         }
         .sheet(isPresented: $showSettings) {
-            SettingsView().preferredColorScheme(.dark)
+            SettingsView()
+                .environmentObject(engine)
+                .preferredColorScheme(.dark)
         }
     }
 
@@ -103,7 +105,9 @@ struct ContentView: View {
 
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var engine: LocationEngine
     @AppStorage(SettingsKey.unitIsMetric) private var unitIsMetric = false
+    @AppStorage(SettingsKey.refreshSeconds) private var refreshSeconds = 1
 
     var body: some View {
         NavigationStack {
@@ -114,6 +118,18 @@ struct SettingsView: View {
                         Text("Metric (m)").tag(true)
                     }
                     .pickerStyle(.segmented)
+                }
+                Section("Update rate") {
+                    Picker("Refresh", selection: $refreshSeconds) {
+                        ForEach(RefreshRate.allCases) { rate in
+                            Text(rate.label).tag(rate.rawValue)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .onChange(of: refreshSeconds) { _ in engine.reloadRefreshRate() }
+                    Text(refreshFootnote)
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
                 }
                 Section {
                     Text("Compass uses true north. Place names come from Apple Maps and need a network connection; compass and altitude work offline.")
@@ -127,6 +143,15 @@ struct SettingsView: View {
                     Button("Done") { dismiss() }
                 }
             }
+        }
+    }
+
+    private var refreshFootnote: String {
+        switch RefreshRate(rawValue: refreshSeconds) ?? .s1 {
+        case .s1, .s2:
+            return "Faster updates and full GPS accuracy — most responsive, most battery."
+        case .s5, .s10:
+            return "Slower updates ease off the GPS to save battery and heat. Altitude and town/road get a little coarser."
         }
     }
 }

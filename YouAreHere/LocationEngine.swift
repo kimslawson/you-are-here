@@ -48,7 +48,8 @@ final class LocationEngine: NSObject, ObservableObject {
     // MARK: Tick throttle
     private var tickTimer: Timer?
     private var lastTick = Date.distantPast
-    private let tickInterval: TimeInterval = 1.0
+    private var refreshRate: RefreshRate = .s1
+    private var tickInterval: TimeInterval { refreshRate.interval }
 
     // MARK: Flash comparison (the "last committed" displayed values)
     private var lastTown: String?
@@ -75,14 +76,13 @@ final class LocationEngine: NSObject, ObservableObject {
     override init() {
         super.init()
         manager.delegate = self
-        manager.desiredAccuracy = kCLLocationAccuracyBest
-        manager.distanceFilter = kCLDistanceFilterNone
         manager.activityType = .automotiveNavigation
         manager.pausesLocationUpdatesAutomatically = false
-        manager.headingFilter = 1   // degrees
         manager.headingOrientation = .portrait
         authorization = manager.authorizationStatus
         isPaused = UserDefaults.standard.bool(forKey: SettingsKey.isPaused)
+        refreshRate = RefreshRate.current()
+        applyRefreshConfiguration()   // sets accuracy + distance/heading filters
         updateHeadingOrientation()
 
         pathMonitor.pathUpdateHandler = { [weak self] path in
@@ -191,10 +191,31 @@ final class LocationEngine: NSObject, ObservableObject {
             }
         }
 
+        scheduleTickTimer()
+    }
+
+    private func scheduleTickTimer() {
         tickTimer?.invalidate()
         tickTimer = Timer.scheduledTimer(withTimeInterval: tickInterval, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.tick(force: false) }
         }
+    }
+
+    /// Push the current refresh rate down to CoreLocation. Cheap to call anytime.
+    private func applyRefreshConfiguration() {
+        manager.desiredAccuracy = refreshRate.desiredAccuracy
+        manager.distanceFilter = refreshRate.distanceFilter
+        manager.headingFilter = refreshRate.headingFilter
+        // Rebuild the tick at the new cadence only if it's currently running.
+        if tickTimer != nil { scheduleTickTimer() }
+    }
+
+    /// Re-read the user's refresh-rate choice and apply it live.
+    func reloadRefreshRate() {
+        let rate = RefreshRate.current()
+        guard rate != refreshRate else { return }
+        refreshRate = rate
+        applyRefreshConfiguration()
     }
 
     private func suspendSensors() {
