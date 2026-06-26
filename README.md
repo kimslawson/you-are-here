@@ -201,9 +201,24 @@ python3 design/appicon.py   # rewrites YouAreHere/Assets.xcassets/AppIcon.appico
 
 ## Known limitations / next steps
 
-- **Route shields are heuristic.** Apple's geocoder doesn't return a structured
-  route number, so `RouteParser` pattern-matches the road text ("I-80",
-  "US Highway 50", "CA-89", "State Route 89"). Some roads won't match and will
-  show as a plain name. Improving this is a good place for the offline dataset.
+- **Route numbers depend on the data source.** Apple's geocoder has no route-
+  number field — it only surfaces a number when the road's *name* is itself the
+  route (e.g. it returns "I-80" or "CA-89" as the thoroughfare). For a road Apple
+  labels by street name (e.g. "St George Rd", which is also ME-131), Apple gives
+  us nothing to show a shield from. Two paths fill this in:
+  - **Online lookup (opt-in).** *Settings ▸ Route numbers ▸ Look up online.* When
+    Apple gives a plain street name, the app queries OpenStreetMap (Overpass) for
+    the nearest road's route `ref` and shows the shield (see
+    `RouteRefResolver.swift`). It's **off by default** because it sends your
+    coordinate to a third-party server (`overpass-api.de`) and needs a network
+    connection — so it won't help in the no-signal areas this app is otherwise
+    built for. To stay within Overpass's fair-use limits, it fires **only when
+    the road changes** (not every tick), one request at a time, with a minimum
+    spacing between calls; failures fall back silently to Apple-only behavior.
+  - **Offline dataset (future).** Bundled OSM data would supply route `ref`s with
+    no network and work off-grid. `RouteRefResolver` is a protocol so an offline
+    resolver can drop in behind the same seam.
+- **Route shields are heuristic.** `RouteParser` pattern-matches the route text
+  ("I-80", "US Highway 50", "CA-89", "ME 131"); some forms won't match and show
+  as a plain name. Shields are stylized, not pixel-accurate MUTCD artwork.
 - **Offline naming** isn't implemented yet (see the warning above).
-- Shields are stylized, not pixel-accurate MUTCD artwork.

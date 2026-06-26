@@ -7,6 +7,7 @@ enum SettingsKey {
     static let liveActivityEnabled = "liveActivityEnabled"
     static let isPaused = "isPaused"
     static let refreshSeconds = "refreshSeconds"
+    static let onlineRouteLookup = "onlineRouteLookup"
 }
 
 extension UserDefaults {

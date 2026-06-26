@@ -46,6 +46,17 @@ final class LocationEngine: NSObject, ObservableObject {
     private let geocodeMinInterval: TimeInterval = 12
     private var lastGeocodeAttempt = Date.distantPast
 
+    // MARK: Online route lookup (opt-in; fills route numbers Apple omits)
+    private let routeResolver: RouteRefResolver = OverpassRouteResolver()
+    private var routeLookupInFlight = false
+    private var lastRouteLookup = Date.distantPast
+    /// The road we last resolved a route for, and the result (nil = looked up,
+    /// found nothing — so we don't keep retrying the same road).
+    private var routeLookupRoad: String?
+    private var routeLookupResult: RouteRef?
+    /// Minimum spacing between Overpass calls, on top of the once-per-road gate.
+    private let routeLookupMinInterval: TimeInterval = 5
+
     // MARK: Tick throttle
     private var tickTimer: Timer?
     private var lastTick = Date.distantPast
@@ -271,7 +282,11 @@ final class LocationEngine: NSObject, ObservableObject {
         let metric = UserDefaults.standard.unitIsMetric
         let town = lastPlace?.town ?? ""
         let road = lastPlace?.road ?? ""
-        let route = lastPlace?.route
+        // Prefer Apple's route; otherwise use the online lookup result if enabled
+        // and it was resolved for this same road.
+        let onlineRoute = UserDefaults.standard.bool(forKey: SettingsKey.onlineRouteLookup)
+            && road == routeLookupRoad ? routeLookupResult : nil
+        let route = lastPlace?.route ?? onlineRoute
         let routeLabel = route.map(Formatting.routeLabel)
         let altitude = fuser.altitudeMeters ?? (loc.verticalAccuracy > 0 ? loc.altitude : nil)
         let heading = latestHeading
@@ -355,10 +370,42 @@ final class LocationEngine: NSObject, ObservableObject {
                 await MainActor.run {
                     self.lastPlace = place
                     self.lastGeocodedLocation = target
+                    self.maybeLookupRoute(target: target, place: place)
                 }
             } catch {
                 // Network blip or no result: keep the last known place (stale).
                 // hasSignal is driven by NWPathMonitor, so the UI shows offline.
+            }
+        }
+    }
+
+    /// Fill in a route number from OpenStreetMap when the user has opted in and
+    /// Apple gave only a plain street name. Fires at most once per *road change*
+    /// (and never faster than `routeLookupMinInterval`) to respect Overpass's
+    /// fair-use limits.
+    private func maybeLookupRoute(target: CLLocation, place: ResolvedPlace) {
+        guard UserDefaults.standard.bool(forKey: SettingsKey.onlineRouteLookup) else { return }
+        guard networkAvailable else { return }
+        guard place.route == nil else { return }            // Apple already had it
+        let road = place.road
+        guard !road.isEmpty else { return }
+        guard road != routeLookupRoad else { return }       // already handled this road
+        // Watchdog + minimum spacing between calls.
+        if routeLookupInFlight && Date().timeIntervalSince(lastRouteLookup) < 30 { return }
+        guard Date().timeIntervalSince(lastRouteLookup) >= routeLookupMinInterval else { return }
+
+        routeLookupInFlight = true
+        lastRouteLookup = Date()
+
+        Task { [weak self] in
+            guard let self else { return }
+            defer { Task { @MainActor in self.routeLookupInFlight = false } }
+            let ref = try? await self.routeResolver.routeRef(near: target)
+            await MainActor.run {
+                // Record the result against the road so we don't re-query it,
+                // whether or not we found a number.
+                self.routeLookupRoad = road
+                self.routeLookupResult = ref
             }
         }
     }
