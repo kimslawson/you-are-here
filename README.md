@@ -59,7 +59,7 @@ app alive to refresh the Live Activity even with the screen locked.
   for altitude/heading drift no more than every few seconds. iOS enforces a
   Live Activity update *budget*; this cadence stays well inside it while still
   feeling live. Tune via `activityNumericInterval` in `LocationEngine.swift`.
-  The `NSSupportsLiveActivitiesFrequentUpdates` entitlement is set.
+  The `NSSupportsLiveActivitiesFrequentUpdates` Info.plist key is set.
 
 ## ⚠️ Offline place naming — important
 
@@ -78,6 +78,61 @@ true offline naming later — e.g. a bundled OpenStreetMap-derived gazetteer —
 implement that protocol and have `LocationEngine` fall back to it when offline.
 Nothing else needs to change. (Expect tens of MB to GBs depending on the
 coverage region you bundle.)
+
+---
+
+## Permissions & entitlements
+
+### What the user is prompted for (first launch)
+
+On first run iOS shows these system prompts, each backed by a usage string in
+`YouAreHere/Info.plist`:
+
+| Prompt | Info.plist key | Why |
+|---|---|---|
+| **Location** | `NSLocationWhenInUseUsageDescription` | Name the town/road, heading, altitude |
+| **Location "Always"** (a *second*, later prompt) | `NSLocationAlwaysAndWhenInUseUsageDescription` | Keep updating with the screen locked + resume from parked |
+| **Motion & Fitness** | `NSMotionUsageDescription` | Barometer, for smooth/accurate altitude |
+| **Live Activities** | (toggle, not a usage string) | Show the Lock Screen / Dynamic Island activity |
+
+### The two-step location flow — and why "Always" matters
+
+iOS **does not let an app request "Always" directly**. The engine first calls
+`requestWhenInUseAuthorization()`; once granted it calls
+`requestAlwaysAuthorization()`, which is what triggers the *second* "Keep
+Allowing Always?" prompt — and iOS often defers that prompt until you've been
+using the app for a bit. So expect **two separate prompts, minutes or a session
+apart**. (See `start()` in `LocationEngine.swift`.)
+
+**"While Using" is not enough for the core use case.** With only *When In Use*:
+
+- Updates pause when you lock the screen or switch apps, so the Lock Screen
+  Live Activity goes stale — defeating the "glance without unlocking" point.
+- **Parked → resume is unreliable.** Parking stops location, so iOS suspends and
+  may terminate the app. Tapping play relaunches it in the background to run the
+  intent, but a background-launched app can only restart location with **Always**
+  authorization. With *When In Use*, resume may not relight GPS until you next
+  open the app by hand.
+
+So for this app to do what it's for, grant **Always**. If you only see *When In
+Use* in Settings, go to **Settings → You Are Here → Location → Always**. The blue
+status-bar pill while it's tracking is expected (`showsBackgroundLocationIndicator`).
+
+### Entitlements / capabilities
+
+There is **no `.entitlements` file and no special code-signing entitlement** —
+Live Activities and background location are enabled purely through `Info.plist`
+keys, so there's nothing to toggle under Signing & Capabilities for them:
+
+- `NSSupportsLiveActivities` + `NSSupportsLiveActivitiesFrequentUpdates`
+- `UIBackgroundModes` → `location` (keeps the app alive in the background to
+  refresh the activity)
+
+No App Group is used: the Live Activity pause button is a `LiveActivityIntent`
+that runs in the app's process and reaches the engine through an in-process
+closure, so app/widget don't need shared storage. (If you later add an offline
+dataset or want the widget to read settings directly, that's when you'd add an
+App Group — and *that* would be a real capability to enable on both targets.)
 
 ---
 
@@ -103,6 +158,10 @@ Then in Xcode:
    background location don't work in the Simulator).
 4. Make sure **Settings → Face ID & Passcode → Live Activities** and the app's
    own Live Activities permission are enabled.
+5. On first launch, accept the location prompt, then accept the **second
+   "Always"** prompt when it appears (or set **Settings → You Are Here →
+   Location → Always**). See *Permissions & entitlements* above for why Always
+   matters.
 
 **Requirements:** iOS 16.2+, Xcode 15+, a device with a barometer (all modern
 iPhones), and a paid Apple Developer account for on-device Live Activities.
