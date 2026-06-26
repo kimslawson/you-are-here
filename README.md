@@ -185,6 +185,18 @@ YouAreHere/                     App target
   Settings                      UserDefaults keys
 YouAreHereWidget/               Widget extension target
   YouAreHereLiveActivity        Lock Screen + Dynamic Island presentations
+design/
+  appicon.py                    Regenerates the app icon (run with Pillow)
+```
+
+The **app icon** is the app in miniature — grey "YOU / ARE" kicker, big bright
+"HERE", and a rough treasure-map red X — on near-black, matching the app's
+bright-on-dark skin. It's generated programmatically (so it's tweakable and
+diffable) by `design/appicon.py`; re-run it after edits:
+
+```bash
+pip install Pillow
+python3 design/appicon.py   # rewrites YouAreHere/Assets.xcassets/AppIcon.appiconset/AppIcon.png
 ```
 
 ## Known limitations / next steps
