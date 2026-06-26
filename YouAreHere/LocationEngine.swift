@@ -18,6 +18,7 @@ final class LocationEngine: NSObject, ObservableObject {
     // MARK: Published state for the on-screen app
     @Published private(set) var state = LocationActivityAttributes.ContentState(
         town: "", road: "", route: nil, altitudeMeters: nil, headingDegrees: nil,
+        headingContinuous: nil,
         unitIsMetric: false, hasSignal: true, isPaused: false,
         townChanged: false, roadChanged: false, headingChanged: false)
     @Published private(set) var authorization: CLAuthorizationStatus = .notDetermined
@@ -50,6 +51,12 @@ final class LocationEngine: NSObject, ObservableObject {
     private var lastTick = Date.distantPast
     private var refreshRate: RefreshRate = .s1
     private var tickInterval: TimeInterval { refreshRate.interval }
+
+    // MARK: Heading animation
+    /// Continuous (unwrapped) heading so the arrow rotates the short way across
+    /// north in both the app and the Live Activity. Resets per process, so it
+    /// never grows unbounded across sessions.
+    private var continuousHeading: Double?
 
     // MARK: Flash comparison (the "last committed" displayed values)
     private var lastTown: String?
@@ -270,6 +277,18 @@ final class LocationEngine: NSObject, ObservableObject {
         let heading = latestHeading
         let cardinal = heading.map(Formatting.cardinal)
 
+        // Accumulate a continuous heading (shortest signed step) for the arrow.
+        if let heading {
+            if let cur = continuousHeading {
+                var delta = (heading - cur).truncatingRemainder(dividingBy: 360)
+                if delta > 180 { delta -= 360 }
+                if delta < -180 { delta += 360 }
+                continuousHeading = cur + delta
+            } else {
+                continuousHeading = heading
+            }
+        }
+
         // Flash detection: compare to last committed display values.
         let townChanged = lastTown != nil && town != lastTown && !town.isEmpty
         let roadChanged = lastRoad != nil && (road != lastRoad || routeLabel != lastRouteLabel)
@@ -278,6 +297,7 @@ final class LocationEngine: NSObject, ObservableObject {
         let newState = LocationActivityAttributes.ContentState(
             town: town, road: road, route: route,
             altitudeMeters: altitude, headingDegrees: heading,
+            headingContinuous: continuousHeading,
             unitIsMetric: metric, hasSignal: networkAvailable, isPaused: false,
             townChanged: townChanged, roadChanged: roadChanged, headingChanged: headingChanged)
 

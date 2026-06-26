@@ -100,7 +100,7 @@ struct WayfindingView<Trailing: View>: View {
                     .font(Theme.font(size: smallSize, weight: .medium))
                     .foregroundColor(Theme.textColor(changed: state.headingChanged, base: Theme.secondary))
             } icon: {
-                CompassArrow(degrees: state.headingDegrees,
+                CompassArrow(degrees: state.headingContinuous,
                              size: smallSize * 0.85,
                              color: Theme.textColor(changed: state.headingChanged, base: Theme.secondary))
             }

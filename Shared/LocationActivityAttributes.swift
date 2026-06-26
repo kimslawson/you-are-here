@@ -28,8 +28,14 @@ struct LocationActivityAttributes: ActivityAttributes {
 
         /// Canonical altitude in meters; formatted per `unitIsMetric` at render.
         var altitudeMeters: Double?
-        /// True-north heading in degrees [0, 360).
+        /// True-north heading in degrees [0, 360). Used for the text + cardinal.
         var headingDegrees: Double?
+        /// Continuous (unwrapped, accumulating) heading angle for the rotating
+        /// arrow. The engine keeps it continuous so consecutive values differ by
+        /// the *shortest* signed step — both the app's container animation and
+        /// ActivityKit's snapshot interpolation then rotate the short way across
+        /// north (a raw 350°→10° would otherwise spin backwards 340°).
+        var headingContinuous: Double?
 
         /// Whether the user prefers metric. Carried in state so the widget
         /// renders correctly without needing a shared app group.
@@ -53,6 +59,7 @@ struct LocationActivityAttributes: ActivityAttributes {
                 route: RouteRef(kind: .interstate, number: "80", stateAbbrev: nil),
                 altitudeMeters: 1816,
                 headingDegrees: 305,
+                headingContinuous: 305,
                 unitIsMetric: false,
                 hasSignal: true,
                 isPaused: false,

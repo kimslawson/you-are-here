@@ -1,57 +1,25 @@
 import SwiftUI
 
-/// A north-pointing arrow that rotates the *short way* around.
+/// A north-pointing arrow. It expects a *continuous* angle (see
+/// `ContentState.headingContinuous`) that the engine keeps unwrapped so each
+/// successive value differs by the shortest signed step. That way the rotation
+/// animates the short way across north in BOTH contexts:
 ///
-/// Feeding `rotationEffect` the raw 0–359° heading makes SwiftUI spin the long
-/// way when the value wraps (e.g. 350° → 10° animates −340° instead of +20°).
-/// We instead keep a continuous, accumulating angle and advance it by the
-/// shortest signed delta each update, so it always animates smoothly across N.
+///   - In the app, the enclosing view's `.animation(value: state)` tweens it.
+///   - In the Live Activity / Dynamic Island, ActivityKit tweens between
+///     content snapshots. (A per-view `@State` accumulator can't work there —
+///     the system re-renders the view fresh for every snapshot — which is why
+///     the continuity has to come from the model, not the view.)
 struct CompassArrow: View {
+    /// Continuous heading angle in degrees (may exceed 360 / go negative).
     let degrees: Double?
     var size: CGFloat
     var color: Color
-
-    /// Continuous angle (may exceed 360 / go negative); only the visual matters.
-    @State private var displayed: Double = 0
-    @State private var hasValue = false
 
     var body: some View {
         Image(systemName: "location.north.line.fill")
             .font(.system(size: size))
             .foregroundColor(color)
-            .rotationEffect(.degrees(displayed))
-            .onAppear { sync(animated: false) }
-            .onChange(of: degrees) { _ in sync(animated: true) }
-    }
-
-    private func sync(animated: Bool) {
-        guard let target = degrees else { return }
-        guard hasValue else {
-            displayed = target
-            hasValue = true
-            return
-        }
-
-        // Keep the accumulator bounded so it can't drift over days/weeks of use.
-        // Reducing by whole turns is visually identical, so do it WITHOUT
-        // animation — otherwise SwiftUI would spin a full revolution. After this,
-        // `displayed` stays within (-540, 540) forever.
-        if displayed < -360 || displayed > 360 {
-            var t = Transaction()
-            t.disablesAnimations = true
-            withTransaction(t) { displayed = displayed.truncatingRemainder(dividingBy: 360) }
-        }
-
-        // Shortest signed step into (-180, 180].
-        var delta = (target - displayed).truncatingRemainder(dividingBy: 360)
-        if delta > 180 { delta -= 360 }
-        if delta < -180 { delta += 360 }
-        let next = displayed + delta
-
-        if animated {
-            withAnimation(.easeOut(duration: 0.25)) { displayed = next }
-        } else {
-            displayed = next
-        }
+            .rotationEffect(.degrees(degrees ?? 0))
     }
 }

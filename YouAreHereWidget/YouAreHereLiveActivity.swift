@@ -76,9 +76,8 @@ struct YouAreHereLiveActivity: Widget {
                     .lineLimit(1)
                     .frame(maxWidth: 80)
             } minimal: {
-                Image(systemName: "location.north.line.fill")
-                    .rotationEffect(.degrees(context.state.headingDegrees ?? 0))
-                    .foregroundColor(Theme.primary)
+                CompassArrow(degrees: context.state.headingContinuous,
+                             size: 16, color: Theme.primary)
             }
             .widgetURL(URL(string: "youarehere://open"))
             .keylineTint(Theme.primary)
