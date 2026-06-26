@@ -84,6 +84,16 @@ final class LocationEngine: NSObject, ObservableObject {
         pathMonitor.start(queue: DispatchQueue.global(qos: .utility))
     }
 
+    deinit {
+        // Defensive cleanup if the engine is ever torn down (it's normally an
+        // app-lifetime object). NWPathMonitor.cancel and removeObserver are
+        // both safe to call off the main actor.
+        pathMonitor.cancel()
+        if let orientationObserver {
+            NotificationCenter.default.removeObserver(orientationObserver)
+        }
+    }
+
     // MARK: Lifecycle
 
     func requestAuthorization() {
@@ -210,7 +220,10 @@ final class LocationEngine: NSObject, ObservableObject {
 
     private func maybeGeocode(_ location: CLLocation) {
         guard placeProvider.requiresNetwork ? networkAvailable : true else { return }
-        guard !geocodeInFlight else { return }
+        // Watchdog: normally one request at a time, but if a request ever wedges
+        // (its continuation never resumes) don't let geocoding die for the whole
+        // session — let a new one through after a generous timeout.
+        if geocodeInFlight && Date().timeIntervalSince(lastGeocodeAttempt) < 30 { return }
 
         let movedEnough = lastGeocodedLocation.map {
             location.distance(from: $0) >= geocodeDistanceThreshold

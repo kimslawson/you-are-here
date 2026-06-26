@@ -26,17 +26,28 @@ struct CompassArrow: View {
 
     private func sync(animated: Bool) {
         guard let target = degrees else { return }
-        let next: Double
-        if hasValue {
-            // Shortest signed step into (-180, 180].
-            var delta = (target - displayed).truncatingRemainder(dividingBy: 360)
-            if delta > 180 { delta -= 360 }
-            if delta < -180 { delta += 360 }
-            next = displayed + delta
-        } else {
-            next = target
+        guard hasValue else {
+            displayed = target
+            hasValue = true
+            return
         }
-        hasValue = true
+
+        // Keep the accumulator bounded so it can't drift over days/weeks of use.
+        // Reducing by whole turns is visually identical, so do it WITHOUT
+        // animation — otherwise SwiftUI would spin a full revolution. After this,
+        // `displayed` stays within (-540, 540) forever.
+        if displayed < -360 || displayed > 360 {
+            var t = Transaction()
+            t.disablesAnimations = true
+            withTransaction(t) { displayed = displayed.truncatingRemainder(dividingBy: 360) }
+        }
+
+        // Shortest signed step into (-180, 180].
+        var delta = (target - displayed).truncatingRemainder(dividingBy: 360)
+        if delta > 180 { delta -= 360 }
+        if delta < -180 { delta += 360 }
+        let next = displayed + delta
+
         if animated {
             withAnimation(.easeOut(duration: 0.25)) { displayed = next }
         } else {
