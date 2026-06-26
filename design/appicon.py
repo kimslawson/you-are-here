@@ -20,7 +20,8 @@ SS = 4                      # supersample for crisp anti-aliasing
 W = 1024
 S = W * SS
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.join(HERE, "..", "YouAreHere", "Assets.xcassets", "AppIcon.appiconset", "AppIcon.png")
+ICONSET = os.path.join(HERE, "..", "YouAreHere", "Assets.xcassets", "AppIcon.appiconset")
+OUT = os.path.join(ICONSET, "AppIcon.png")
 
 # Pick the first font that exists.
 FONT_CANDIDATES = [
@@ -67,8 +68,12 @@ def rough_x(d, cx, cy, L, w, color, seed=21, rot=-4):
                        (p2[0] + rnd.uniform(-w*0.3, w*0.3), p2[1] + rnd.uniform(-w*0.3, w*0.3)),
                     w * 0.55, color, rnd)
 
-def render():
-    img = Image.new("RGB", (S, S), BG)        # RGB = opaque, no alpha (iOS requires)
+def compose(bg=BG, kicker=GREY, here=WHITE, xcolor=RED, transparent=False):
+    """Draw the icon and return a 1024x1024 PIL image (RGB, or RGBA if
+    transparent=True for the Dark/Tinted/Clear appearance variants)."""
+    mode = "RGBA" if transparent else "RGB"
+    base = (0, 0, 0, 0) if transparent else bg
+    img = Image.new(mode, (S, S), base)
     d = ImageDraw.Draw(img, "RGBA")
     x0 = int(0.105 * S)
 
@@ -87,14 +92,32 @@ def render():
         b = d.textbbox((0, 0), text, font=font)
         d.text((x0 - b[0], yy - b[1]), text, font=font, fill=color)
 
-    left("YOU", fs, y, GREY); y += sh + line_gap
-    left("ARE", fs, y, GREY); y += sh + big_gap
-    left("HERE", fb, y, WHITE)
+    left("YOU", fs, y, kicker); y += sh + line_gap
+    left("ARE", fs, y, kicker); y += sh + big_gap
+    left("HERE", fb, y, here)
 
-    rough_x(d, 0.720 * S, 0.300 * S, 0.140 * S, 0.047 * S, RED, seed=21, rot=-4)
+    rough_x(d, 0.720 * S, 0.300 * S, 0.140 * S, 0.047 * S, xcolor, seed=21, rot=-4)
 
-    img.resize((W, W), Image.LANCZOS).save(os.path.normpath(OUT))
+    return img.resize((W, W), Image.LANCZOS)
+
+def render():
+    # Standard (Light): opaque RGB, no alpha (iOS requires for the base icon).
+    compose().save(os.path.normpath(OUT))
     print("wrote", os.path.normpath(OUT))
+
+    # Dark appearance: same bright foreground on a transparent background, so the
+    # system's dark substrate shows through.
+    dark = os.path.normpath(os.path.join(ICONSET, "AppIcon-Dark.png"))
+    compose(transparent=True).save(dark)
+    print("wrote", dark)
+
+    # Tinted appearance: a neutral grayscale source the system recolors to the
+    # user's chosen hue. The X is lifted off pure-red luminance (which tints
+    # muddy) so the HERE > X > kicker hierarchy survives any tint.
+    tinted = os.path.normpath(os.path.join(ICONSET, "AppIcon-Tinted.png"))
+    compose(transparent=True, kicker=(150, 150, 150),
+            here=(245, 245, 245), xcolor=(205, 205, 205)).save(tinted)
+    print("wrote", tinted)
 
 if __name__ == "__main__":
     render()
