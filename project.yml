@@ -13,7 +13,11 @@ settings:
     CODE_SIGN_STYLE: Automatic
     # Set your Apple Developer team id here (or in Xcode > Signing & Capabilities).
     DEVELOPMENT_TEAM: ""
-    GENERATE_INFOPLIST_FILE: NO
+    # Let Xcode inject the standard CFBundle* keys (CFBundleIdentifier, etc.) and
+    # MERGE them into our custom Info.plist files (which add the Live Activity,
+    # location, and background-mode keys). Without this the built .app has no
+    # CFBundleIdentifier and the device refuses it as "not a valid bundle".
+    GENERATE_INFOPLIST_FILE: YES
 
 targets:
   YouAreHere:
