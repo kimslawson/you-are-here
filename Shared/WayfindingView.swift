@@ -97,10 +97,9 @@ struct WayfindingView: View {
                     .font(Theme.font(size: smallSize, weight: .medium))
                     .foregroundColor(Theme.textColor(changed: state.headingChanged, base: Theme.secondary))
             } icon: {
-                Image(systemName: "location.north.line.fill")
-                    .font(.system(size: smallSize * 0.85))
-                    .rotationEffect(.degrees(state.headingDegrees ?? 0))
-                    .foregroundColor(Theme.textColor(changed: state.headingChanged, base: Theme.secondary))
+                CompassArrow(degrees: state.headingDegrees,
+                             size: smallSize * 0.85,
+                             color: Theme.textColor(changed: state.headingChanged, base: Theme.secondary))
             }
 
             if !state.hasSignal {
