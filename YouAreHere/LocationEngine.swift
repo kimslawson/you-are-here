@@ -63,6 +63,9 @@ final class LocationEngine: NSObject, ObservableObject {
     /// (town/road/route/cardinal) push immediately regardless.
     private let activityNumericInterval: TimeInterval = 3.0
 
+    // MARK: Heading orientation
+    private var orientationObserver: NSObjectProtocol?
+
     override init() {
         super.init()
         manager.delegate = self
@@ -73,6 +76,7 @@ final class LocationEngine: NSObject, ObservableObject {
         manager.headingFilter = 1   // degrees
         manager.headingOrientation = .portrait
         authorization = manager.authorizationStatus
+        updateHeadingOrientation()
 
         pathMonitor.pathUpdateHandler = { [weak self] path in
             Task { @MainActor in self?.networkAvailable = (path.status == .satisfied) }
@@ -110,6 +114,16 @@ final class LocationEngine: NSObject, ObservableObject {
         manager.startUpdatingHeading()
         fuser.start()
 
+        // Keep the heading reference in sync with how the device is held, so the
+        // compass reads the same physical direction in portrait and landscape.
+        UIDevice.current.beginGeneratingDeviceOrientationNotifications()
+        updateHeadingOrientation()
+        orientationObserver = NotificationCenter.default.addObserver(
+            forName: UIDevice.orientationDidChangeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.updateHeadingOrientation() }
+        }
+
         tickTimer = Timer.scheduledTimer(withTimeInterval: tickInterval, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.tick(force: false) }
         }
@@ -125,7 +139,29 @@ final class LocationEngine: NSObject, ObservableObject {
         fuser.stop()
         tickTimer?.invalidate()
         tickTimer = nil
+        if let orientationObserver {
+            NotificationCenter.default.removeObserver(orientationObserver)
+            self.orientationObserver = nil
+        }
+        UIDevice.current.endGeneratingDeviceOrientationNotifications()
         endLiveActivity()
+    }
+
+    /// Map the physical device orientation onto CoreLocation's heading reference.
+    /// `CLDeviceOrientation` mirrors `UIDeviceOrientation`'s cases, so a held
+    /// device's "top of screen" points the same way in every orientation. Flat
+    /// (faceUp/faceDown) and unknown are ignored so we keep the last upright
+    /// reference instead of jumping.
+    private func updateHeadingOrientation() {
+        let orientation: CLDeviceOrientation
+        switch UIDevice.current.orientation {
+        case .portrait:            orientation = .portrait
+        case .portraitUpsideDown:  orientation = .portraitUpsideDown
+        case .landscapeLeft:       orientation = .landscapeLeft
+        case .landscapeRight:      orientation = .landscapeRight
+        default:                   return   // faceUp / faceDown / unknown
+        }
+        manager.headingOrientation = orientation
     }
 
     // MARK: Tick
