@@ -4,11 +4,8 @@
 <dict>
 	<key>CFBundleDisplayName</key>
 	<string>You Are Here</string>
-	<key>UILaunchScreen</key>
-	<dict>
-		<key>UIColorName</key>
-		<string></string>
-	</dict>
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
 
 	<!-- Live Activities -->
 	<key>NSSupportsLiveActivities</key>

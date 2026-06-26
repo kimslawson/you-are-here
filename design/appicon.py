@@ -20,8 +20,12 @@ SS = 4                      # supersample for crisp anti-aliasing
 W = 1024
 S = W * SS
 HERE = os.path.dirname(os.path.abspath(__file__))
-ICONSET = os.path.join(HERE, "..", "YouAreHere", "Assets.xcassets", "AppIcon.appiconset")
+ASSETS = os.path.join(HERE, "..", "YouAreHere", "Assets.xcassets")
+ICONSET = os.path.join(ASSETS, "AppIcon.appiconset")
 OUT = os.path.join(ICONSET, "AppIcon.png")
+LAUNCHSET = os.path.join(ASSETS, "LaunchIcon.imageset")
+
+LAUNCH_GREY = (193, 195, 200)   # soft grey for the light launch placeholder
 
 # Pick the first font that exists.
 FONT_CANDIDATES = [
@@ -118,6 +122,14 @@ def render():
     compose(transparent=True, kicker=(150, 150, 150),
             here=(245, 245, 245), xcolor=(205, 205, 205)).save(tinted)
     print("wrote", tinted)
+
+    # Launch placeholder: the whole mark in a soft uniform light grey on a
+    # transparent background, so it reads as a calm watermark on the white launch
+    # screen (LaunchScreen.storyboard centers it at ~2/3 of the screen width).
+    launch = os.path.normpath(os.path.join(LAUNCHSET, "LaunchIcon.png"))
+    compose(transparent=True, kicker=LAUNCH_GREY,
+            here=LAUNCH_GREY, xcolor=LAUNCH_GREY).save(launch)
+    print("wrote", launch)
 
 if __name__ == "__main__":
     render()
