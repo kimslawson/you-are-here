@@ -42,20 +42,22 @@ struct WayfindingView<Trailing: View>: View {
 
     // MARK: Line 1 — road + route shield
     private var roadLine: some View {
-        HStack(spacing: smallSize * 0.5) {
+        // Route marker + label share the road's gray color and flash white on change.
+        let routeColor = Theme.textColor(changed: state.roadChanged, base: Theme.secondary)
+        return HStack(spacing: smallSize * 0.5) {
             if let route = state.route {
                 if showSeparateRoad && !state.road.isEmpty {
                     Text(state.road)
                         .font(Theme.font(size: smallSize, weight: .medium))
-                        .foregroundColor(Theme.textColor(changed: state.roadChanged, base: Theme.secondary))
+                        .foregroundColor(routeColor)
                     Text("·")
                         .font(Theme.font(size: smallSize, weight: .medium))
                         .foregroundColor(Theme.secondary)
                 }
-                RouteShield(route: route, height: shieldHeight)
+                RouteShield(route: route, height: shieldHeight, color: routeColor)
                 Text(Formatting.routeLabel(route))
                     .font(Theme.font(size: smallSize, weight: .semibold))
-                    .foregroundColor(Theme.textColor(changed: state.roadChanged, base: Theme.primary))
+                    .foregroundColor(routeColor)
             } else {
                 Text(state.road.isEmpty ? "—" : state.road)
                     .font(Theme.font(size: smallSize, weight: .medium))

@@ -25,7 +25,8 @@ struct YouAreHereLiveActivity: Widget {
                 // Expanded
                 DynamicIslandExpandedRegion(.leading) {
                     if let route = context.state.route {
-                        RouteShield(route: route, height: 26)
+                        RouteShield(route: route, height: 26,
+                                    color: Theme.textColor(changed: context.state.roadChanged, base: Theme.secondary))
                             .padding(.leading, 4)
                     } else {
                         Image(systemName: "road.lanes")

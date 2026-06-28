@@ -1,92 +1,67 @@
 import SwiftUI
 
-/// A compact, recognizable highway shield drawn with SwiftUI shapes (no image
-/// assets needed). Stylized rather than pixel-accurate to the MUTCD, but the
-/// colors and silhouettes read correctly at a glance:
-///   - Interstate: red/blue shield
-///   - US highway: white rounded shield with black number
-///   - State highway: white rounded square / circle with black number
+/// A compact route marker drawn with SwiftUI shapes (no image assets). It's
+/// monochrome — rendered in whatever `color` the caller passes so it matches the
+/// adjacent road text (gray normally, flashing white on change).
+///
+/// The interstate keeps its distinctive shield silhouette and shows the number
+/// (the number *is* the recognizable interstate marker). The generic box
+/// markers (US / state) show only the **region** — "US", or the state abbrev
+/// like "ME" — because the full designation ("US-50", "ME-73") already appears
+/// as text right next to the marker, so repeating the number would be redundant.
 struct RouteShield: View {
     let route: RouteRef
     var height: CGFloat = 22
+    var color: Color = Theme.primary
 
-    private var label: String {
+    /// What goes inside the marker.
+    private var inner: String {
         switch route.kind {
-        case .interstate, .usHighway:
+        case .interstate:
             return route.number
+        case .usHighway:
+            return "US"
         case .stateHighway:
-            if let a = route.stateAbbrev, !a.isEmpty { return "\(a) \(route.number)" }
-            return route.number
+            if let a = route.stateAbbrev, !a.isEmpty { return a }
+            return route.number   // fall back to the number when region unknown
         }
     }
+
+    private var lineWidth: CGFloat { max(1, height * 0.07) }
 
     var body: some View {
         switch route.kind {
         case .interstate: interstate
-        case .usHighway:  usHighway
-        case .stateHighway: stateHighway
+        default:          box
         }
     }
 
-    private var numberFont: Font {
-        Theme.font(size: height * 0.52, weight: .bold)
-    }
-
-    // Interstate: blue shield body, red top banner.
+    // Interstate: shield silhouette outline + number.
     private var interstate: some View {
         ZStack {
-            ShieldShape()
-                .fill(Color(red: 0.04, green: 0.16, blue: 0.45)) // interstate blue
-            ShieldShape()
-                .trim(from: 0, to: 1)
-                .stroke(Color.white, lineWidth: 1)
-            VStack(spacing: 0) {
-                Color(red: 0.78, green: 0.10, blue: 0.16) // interstate red
-                    .frame(height: height * 0.26)
-                Spacer(minLength: 0)
-            }
-            .mask(ShieldShape())
-            Text(route.number)
-                .font(numberFont)
-                .foregroundColor(.white)
-                .padding(.top, height * 0.12)
+            ShieldShape().stroke(color, lineWidth: lineWidth)
+            Text(inner)
+                .font(Theme.font(size: height * 0.5, weight: .bold))
+                .foregroundColor(color)
+                .padding(.top, height * 0.06)
                 .minimumScaleFactor(0.5)
         }
-        .frame(width: height * 0.92, height: height)
+        .frame(width: height * 0.94, height: height)
     }
 
-    // US highway: white rounded shield, black number.
-    private var usHighway: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: height * 0.22)
-                .fill(Color.white)
-            RoundedRectangle(cornerRadius: height * 0.22)
-                .stroke(Color.black, lineWidth: 1)
-            Text(route.number)
-                .font(numberFont)
-                .foregroundColor(.black)
-                .minimumScaleFactor(0.5)
-                .padding(.horizontal, 3)
-        }
-        .frame(minWidth: height * 0.92, idealWidth: height, maxWidth: height * 1.6, maxHeight: height)
-        .fixedSize()
-    }
-
-    // State highway: white square with black number (+ abbrev if present).
-    private var stateHighway: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: height * 0.16)
-                .fill(Color.white)
-            RoundedRectangle(cornerRadius: height * 0.16)
-                .stroke(Color.black, lineWidth: 1)
-            Text(label)
-                .font(Theme.font(size: height * 0.46, weight: .bold))
-                .foregroundColor(.black)
-                .minimumScaleFactor(0.5)
-                .padding(.horizontal, 4)
-        }
-        .frame(minWidth: height * 0.92, maxWidth: height * 1.8, maxHeight: height)
-        .fixedSize()
+    // US / state: rounded-rect outline hugging the region text.
+    private var box: some View {
+        Text(inner)
+            .font(Theme.font(size: height * 0.46, weight: .bold))
+            .foregroundColor(color)
+            .minimumScaleFactor(0.5)
+            .padding(.horizontal, height * 0.22)
+            .frame(height: height)
+            .background(
+                RoundedRectangle(cornerRadius: height * 0.20)
+                    .stroke(color, lineWidth: lineWidth)
+            )
+            .fixedSize()
     }
 }
 
@@ -117,9 +92,9 @@ private struct ShieldShape: Shape {
 
 #Preview {
     HStack(spacing: 12) {
-        RouteShield(route: RouteRef(kind: .interstate, number: "80", stateAbbrev: nil), height: 36)
-        RouteShield(route: RouteRef(kind: .usHighway, number: "50", stateAbbrev: nil), height: 36)
-        RouteShield(route: RouteRef(kind: .stateHighway, number: "89", stateAbbrev: "CA"), height: 36)
+        RouteShield(route: RouteRef(kind: .interstate, number: "80", stateAbbrev: nil), height: 36, color: Theme.secondary)
+        RouteShield(route: RouteRef(kind: .usHighway, number: "50", stateAbbrev: nil), height: 36, color: Theme.secondary)
+        RouteShield(route: RouteRef(kind: .stateHighway, number: "73", stateAbbrev: "ME"), height: 36, color: Theme.secondary)
     }
     .padding()
     .background(Color.black)
