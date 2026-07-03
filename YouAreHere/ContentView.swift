@@ -14,6 +14,9 @@ struct ContentView: View {
     /// top-right corner with the speed-limit sign there). Portrait always shows it.
     @State private var chromeVisible = false
     @State private var chromeHideTask: Task<Void, Never>?
+    // Easter egg: 10 quick taps swap to Comic; 10 more swap back.
+    @State private var eggTaps = 0
+    @State private var lastEggTap = Date.distantPast
 
     var body: some View {
         GeometryReader { geo in
@@ -71,6 +74,7 @@ struct ContentView: View {
             .contentShape(Rectangle())
             .onTapGesture {
                 if !isPortrait { revealChrome() }
+                registerEggTap()
             }
         }
         .onAppear {
@@ -99,8 +103,30 @@ struct ContentView: View {
         .sheet(isPresented: $showSettings) {
             SettingsView()
                 .environmentObject(engine)
-                .preferredColorScheme(.dark)
+                .preferredColorScheme(engine.state.lightMode ? .light : .dark)
         }
+    }
+
+    /// Easter egg: 10 quick taps (≤2s apart) on the screen switch the font to
+    /// Comic; 10 more switch back to whatever was active before.
+    private func registerEggTap() {
+        let now = Date()
+        if now.timeIntervalSince(lastEggTap) > 2 { eggTaps = 0 }
+        lastEggTap = now
+        eggTaps += 1
+        guard eggTaps >= 10 else { return }
+        eggTaps = 0
+
+        let defaults = UserDefaults.standard
+        if AppFont.current() == .comic {
+            let previous = defaults.string(forKey: SettingsKey.preComicFont)
+                ?? AppFont.helvetica.rawValue
+            defaults.set(previous, forKey: SettingsKey.appFont)
+        } else {
+            defaults.set(AppFont.current().rawValue, forKey: SettingsKey.preComicFont)
+            defaults.set(AppFont.comic.rawValue, forKey: SettingsKey.appFont)
+        }
+        engine.reloadAppearance()
     }
 
     private var needsPermission: Bool {
@@ -159,13 +185,38 @@ struct SettingsView: View {
     @AppStorage(SettingsKey.showSpeedLimit) private var showSpeedLimit = false
     @AppStorage(SettingsKey.pictureInPicture) private var pictureInPicture = false
     @AppStorage(SettingsKey.appFont) private var appFont = AppFont.helvetica.rawValue
+    @AppStorage(SettingsKey.lightMode) private var lightMode = false
+    @AppStorage(SettingsKey.customFlashColor) private var customFlashColor = false
+    @AppStorage(SettingsKey.flashColorHex) private var flashColorHex = "FFFFFF"
+
+    /// ColorPicker binding backed by the hex string in UserDefaults.
+    private var flashColorBinding: Binding<Color> {
+        Binding(
+            get: { Color(hex: flashColorHex) ?? .white },
+            set: { newValue in
+                flashColorHex = newValue.hexString ?? "FFFFFF"
+                engine.reloadAppearance()
+            })
+    }
 
     var body: some View {
         NavigationStack {
             Form {
+                Section("Appearance") {
+                    Toggle("Light mode", isOn: $lightMode)
+                        .onChange(of: lightMode) { _ in engine.reloadAppearance() }
+                    Toggle("Custom flash color", isOn: $customFlashColor)
+                        .onChange(of: customFlashColor) { _ in engine.reloadAppearance() }
+                    if customFlashColor {
+                        ColorPicker("Flash color", selection: flashColorBinding, supportsOpacity: false)
+                    }
+                    Text("Light mode inverts the readout's black/white/gray palette. Fields briefly flash when their value changes — white by default (black in light mode), or a color of your choosing.")
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                }
                 Section("Font") {
                     Picker("Font", selection: $appFont) {
-                        ForEach(AppFont.allCases) { family in
+                        ForEach(AppFont.selectable) { family in
                             // Each option previews in its own face.
                             Text(family.label)
                                 .font(Theme.font(size: 17, weight: .medium, family: family))
@@ -174,7 +225,7 @@ struct SettingsView: View {
                     }
                     .pickerStyle(.inline)
                     .labelsHidden()
-                    .onChange(of: appFont) { _ in engine.reloadFont() }
+                    .onChange(of: appFont) { _ in engine.reloadAppearance() }
                     Text("Used across the app, the Live Activity, and the floating window. FS Millbank is a wayfinding face by Fontsmith; Overpass is an open-source take on U.S. highway signage lettering.")
                         .font(.footnote)
                         .foregroundColor(.secondary)

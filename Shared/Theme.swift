@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// The user-selectable UI typeface (Settings ▸ Font). Each case maps SwiftUI
 /// weights onto concrete faces of that family; the choice travels to the
@@ -32,8 +33,14 @@ enum AppFont: String, CaseIterable, Identifiable, Codable {
     case atkinson
     /// The workhorse open-source screen grotesque (OFL), bundled.
     case inter
+    /// Comic Neue (OFL) — the open-source Comic Sans homage. Not listed in the
+    /// Settings picker: it's the Easter egg (tap the app screen 10 times).
+    case comic
 
     var id: String { rawValue }
+
+    /// What the Settings picker offers; the Easter-egg face stays hidden.
+    static var selectable: [AppFont] { allCases.filter { $0 != .comic } }
 
     var label: String {
         switch self {
@@ -48,6 +55,7 @@ enum AppFont: String, CaseIterable, Identifiable, Codable {
         case .b612:         return "B612"
         case .atkinson:     return "Atkinson Hyperlegible"
         case .inter:        return "Inter"
+        case .comic:        return "Comic Sans (basically)"
         }
     }
 
@@ -127,24 +135,57 @@ enum AppFont: String, CaseIterable, Identifiable, Codable {
             case .bold, .heavy, .black, .semibold: return "AtkinsonHyperlegible-Bold"
             default:                               return "AtkinsonHyperlegible-Regular"
             }
+        case .comic:
+            switch weight {
+            case .bold, .heavy, .black, .semibold: return "ComicNeue-Bold"
+            default:                               return "ComicNeue-Regular"
+            }
         }
     }
 }
 
 /// Central place for the wayfinding look: a grotesque sans, bright-on-dark
-/// palette, and the white "flash" used when a field changes.
+/// palette (invertible to light), and the "flash" used when a field changes.
 enum Theme {
 
+    // MARK: Appearance flags
+    // Per-process, like the font choice: the app applies them from UserDefaults
+    // (LocationEngine), the widget from ContentState at render time — no App
+    // Group needed. Views read the computed colors below, so a re-render after
+    // apply() picks the new palette up everywhere.
+    private(set) static var isLight = false
+    private(set) static var flashOverride: Color?
+
+    static func apply(light: Bool, flashHex: String?) {
+        isLight = light
+        flashOverride = flashHex.flatMap { Color(hex: $0) }
+    }
+
+    static func apply(from state: LocationActivityAttributes.ContentState) {
+        apply(light: state.lightMode, flashHex: state.flashHex)
+    }
+
     // MARK: Colors
-    static let background = Color.black
-    /// Primary bright text (slightly warm off-white for comfort on OLED).
-    static let primary = Color(red: 0.97, green: 0.97, blue: 0.95)
+    /// Light mode is a straightforward inversion of the dark values.
+    static var background: Color { isLight ? .white : .black }
+    /// Primary text (slightly warm off-white on OLED; near-black inverted).
+    static var primary: Color {
+        isLight ? Color(red: 0.03, green: 0.03, blue: 0.05)
+                : Color(red: 0.97, green: 0.97, blue: 0.95)
+    }
     /// Secondary / small text.
-    static let secondary = Color(red: 0.74, green: 0.76, blue: 0.80)
-    /// Pure white flash for a value that just changed.
-    static let flash = Color.white
+    static var secondary: Color {
+        isLight ? Color(red: 0.26, green: 0.24, blue: 0.20)
+                : Color(red: 0.74, green: 0.76, blue: 0.80)
+    }
+    /// Flash for a value that just changed: pure white (black in light mode),
+    /// or the user's custom color when one is set.
+    static var flash: Color { flashOverride ?? (isLight ? .black : .white) }
     /// Muted color for the "no signal" state.
-    static let muted = Color(red: 0.55, green: 0.45, blue: 0.30)
+    static var muted: Color {
+        isLight ? Color(red: 0.45, green: 0.55, blue: 0.70)
+                : Color(red: 0.55, green: 0.45, blue: 0.30)
+    }
 
     // MARK: Fonts
     static func font(size: CGFloat, weight: Font.Weight = .regular, family: AppFont = .helvetica) -> Font {
@@ -154,9 +195,31 @@ enum Theme {
         return Font.system(size: size, weight: weight, design: .default)
     }
 
-    /// Color for a field, flashing white on change.
+    /// Color for a field, flashing on change.
     static func textColor(changed: Bool, base: Color = primary) -> Color {
         changed ? flash : base
+    }
+}
+
+// MARK: - Hex color round-trip (custom flash color storage)
+
+extension Color {
+    /// "RRGGBB" (with or without leading #).
+    init?(hex: String) {
+        var s = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+        if s.hasPrefix("#") { s.removeFirst() }
+        guard s.count == 6, let v = UInt64(s, radix: 16) else { return nil }
+        self.init(red: Double((v >> 16) & 0xFF) / 255,
+                  green: Double((v >> 8) & 0xFF) / 255,
+                  blue: Double(v & 0xFF) / 255)
+    }
+
+    var hexString: String? {
+        guard let srgb = CGColorSpace(name: CGColorSpace.sRGB),
+              let c = UIColor(self).cgColor.converted(to: srgb, intent: .defaultIntent, options: nil)?.components,
+              c.count >= 3 else { return nil }
+        func byte(_ x: CGFloat) -> Int { Int((min(max(x, 0), 1) * 255).rounded()) }
+        return String(format: "%02X%02X%02X", byte(c[0]), byte(c[1]), byte(c[2]))
     }
 }
 

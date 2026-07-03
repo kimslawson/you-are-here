@@ -9,6 +9,9 @@ import AppIntents
 struct YouAreHereLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: LocationActivityAttributes.self) { context in
+            // Adopt the appearance the app put in the state (this runs in the
+            // widget process, which can't read the app's UserDefaults).
+            let _ = Theme.apply(from: context.state)
             // Lock Screen / banner presentation.
             WayfindingView(state: context.state, townSize: 40, alignment: .leading,
                            speedSignScale: 2) {
@@ -22,7 +25,8 @@ struct YouAreHereLiveActivity: Widget {
                 .activitySystemActionForegroundColor(Theme.primary)
 
         } dynamicIsland: { context in
-            DynamicIsland {
+            Theme.apply(from: context.state)
+            return DynamicIsland {
                 // Expanded
                 DynamicIslandExpandedRegion(.leading) {
                     if let route = context.state.route {

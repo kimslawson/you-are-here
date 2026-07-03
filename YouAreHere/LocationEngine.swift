@@ -19,7 +19,8 @@ final class LocationEngine: NSObject, ObservableObject {
     @Published private(set) var state = LocationActivityAttributes.ContentState(
         town: "", road: "", route: nil, altitudeMeters: nil, headingDegrees: nil,
         headingContinuous: nil,
-        unitIsMetric: false, fontID: AppFont.current().rawValue,
+        unitIsMetric: false, fontID: AppFont.helvetica.rawValue,
+        lightMode: false, flashHex: nil,
         hasSignal: true, isPaused: false, speedLimitKmh: nil,
         townChanged: false, roadChanged: false, headingChanged: false, speedLimitChanged: false)
     @Published private(set) var authorization: CLAuthorizationStatus = .notDetermined
@@ -103,6 +104,10 @@ final class LocationEngine: NSObject, ObservableObject {
         manager.headingOrientation = .portrait
         authorization = manager.authorizationStatus
         refreshRate = RefreshRate.current()
+        let appearance = refreshAppearance()
+        state.fontID = appearance.fontID
+        state.lightMode = appearance.light
+        state.flashHex = appearance.flashHex
         applyRefreshConfiguration()   // sets accuracy + distance/heading filters
         updateHeadingOrientation()
 
@@ -246,10 +251,22 @@ final class LocationEngine: NSObject, ObservableObject {
         applyRefreshConfiguration()
     }
 
-    /// Re-read the user's font choice and push it to the screen, Live Activity,
-    /// and PiP immediately (works while parked too — no tick needed).
-    func reloadFont() {
+    /// Re-read the appearance settings (font, light mode, flash color) and push
+    /// them to the screen, Live Activity, and PiP immediately (works while
+    /// parked too — no tick needed).
+    func reloadAppearance() {
         pushFrozenState()
+    }
+
+    /// Read the appearance settings, apply them to this process's Theme, and
+    /// return the values to carry in ContentState (for the widget process).
+    private func refreshAppearance() -> (fontID: String, light: Bool, flashHex: String?) {
+        let defaults = UserDefaults.standard
+        let light = defaults.bool(forKey: SettingsKey.lightMode)
+        let flashHex = defaults.bool(forKey: SettingsKey.customFlashColor)
+            ? defaults.string(forKey: SettingsKey.flashColorHex) : nil
+        Theme.apply(light: light, flashHex: flashHex)
+        return (AppFont.current().rawValue, light, flashHex)
     }
 
     private func suspendSensors() {
@@ -329,11 +346,13 @@ final class LocationEngine: NSObject, ObservableObject {
         let headingChanged = lastCardinal != nil && cardinal != nil && cardinal != lastCardinal
         let speedChanged = lastSpeedKmh != nil && speedKmh != nil && speedKmh != lastSpeedKmh
 
+        let appearance = refreshAppearance()
         let newState = LocationActivityAttributes.ContentState(
             town: town, road: road, route: route,
             altitudeMeters: altitude, headingDegrees: heading,
             headingContinuous: continuousHeading,
-            unitIsMetric: metric, fontID: AppFont.current().rawValue,
+            unitIsMetric: metric, fontID: appearance.fontID,
+            lightMode: appearance.light, flashHex: appearance.flashHex,
             hasSignal: networkAvailable, isPaused: false,
             speedLimitKmh: speedKmh,
             townChanged: townChanged, roadChanged: roadChanged, headingChanged: headingChanged,
@@ -365,9 +384,13 @@ final class LocationEngine: NSObject, ObservableObject {
             }
         }
 
+        // Refresh appearance too, so changes apply even while parked.
+        let appearance = refreshAppearance()
         var s = state
         s.isPaused = isPaused
-        s.fontID = AppFont.current().rawValue   // apply font changes even while parked
+        s.fontID = appearance.fontID
+        s.lightMode = appearance.light
+        s.flashHex = appearance.flashHex
         s.townChanged = false
         s.roadChanged = false
         s.headingChanged = false

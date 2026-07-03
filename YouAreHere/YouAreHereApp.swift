@@ -3,6 +3,7 @@ import SwiftUI
 @main
 struct YouAreHereApp: App {
     @StateObject private var engine = LocationEngine.shared
+    @AppStorage(SettingsKey.lightMode) private var lightMode = false
 
     init() {
         // Force the engine to exist at process launch so it installs the Live
@@ -15,7 +16,7 @@ struct YouAreHereApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(engine)
-                .preferredColorScheme(.dark)
+                .preferredColorScheme(lightMode ? .light : .dark)
                 .statusBarHidden(true)
         }
     }

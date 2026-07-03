@@ -53,6 +53,7 @@ When the **town, road, or compass direction changes**, that field briefly
   - **Atkinson Hyperlegible** (OFL) — Braille Institute face engineered for
     maximum character disambiguation.
   - **Inter** (OFL) — the workhorse open screen grotesque.
+  - **Comic Neue** (OFL) — hidden from the picker; reserved for the Easter egg.
 
   All OFL fonts were fetched from Google Fonts. Adding another family: drop
   TTFs in `Shared/Fonts/`, add an `AppFont` case with a weight→face map (use
@@ -61,6 +62,13 @@ When the **town, road, or compass direction changes**, that field briefly
   anywhere this workspace's network could reach — drop-in candidates later.)
 - **Palette:** bright off-white text on true black for contrast and OLED
   comfort; pure white for the change-flash. Centralized in `Shared/Theme.swift`.
+  *Settings ▸ Appearance* offers **light mode** (a straightforward inversion of
+  the black/white/gray values) and a **custom flash color** (color picker,
+  stored as hex; default is white — black in light mode). Both travel to the
+  widget inside `ContentState`, like the font and units.
+- **Easter egg:** tap the app screen 10 times in quick succession and the whole
+  UI switches to Comic Sans (well, Comic Neue — iOS doesn't ship the real
+  thing). Ten more taps restore whatever font you had before.
 - **Settings gear:** always visible in portrait. In landscape it shares the
   top-right corner with the speed-limit sign, so it auto-hides — tap anywhere
   to reveal it for a few seconds.

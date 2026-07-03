@@ -42,6 +42,10 @@ struct LocationActivityAttributes: ActivityAttributes {
         var unitIsMetric: Bool
         /// Chosen UI typeface (`AppFont` raw value); carried for the same reason.
         var fontID: String
+        /// Light mode (inverted palette); carried for the same reason.
+        var lightMode: Bool
+        /// Custom flash color as "RRGGBB", or nil for the default flash.
+        var flashHex: String?
         /// False when we have no network and names are stale.
         var hasSignal: Bool
         /// True when "parked" — sensors are frozen to save battery.
@@ -75,6 +79,8 @@ struct LocationActivityAttributes: ActivityAttributes {
                 headingContinuous: 305,
                 unitIsMetric: false,
                 fontID: AppFont.helvetica.rawValue,
+                lightMode: false,
+                flashHex: nil,
                 hasSignal: true,
                 isPaused: false,
                 speedLimitKmh: 72,

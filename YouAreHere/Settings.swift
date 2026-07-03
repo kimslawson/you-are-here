@@ -10,6 +10,11 @@ enum SettingsKey {
     static let showSpeedLimit = "showSpeedLimit"
     static let pictureInPicture = "pictureInPicture"
     static let appFont = "appFont"
+    static let lightMode = "lightMode"
+    static let customFlashColor = "customFlashColor"
+    static let flashColorHex = "flashColorHex"
+    /// The font in use before the Easter egg switched to Comic, for the way back.
+    static let preComicFont = "preComicFont"
 }
 
 extension AppFont {
