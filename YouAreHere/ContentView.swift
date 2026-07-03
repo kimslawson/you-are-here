@@ -18,7 +18,9 @@ struct ContentView: View {
                 GeometryReader { geo in
                     WayfindingView(state: engine.state,
                                    townSize: townSize(for: geo.size),
-                                   alignment: .leading) {
+                                   alignment: .leading,
+                                   // Portrait is cramped; double the speed sign.
+                                   speedSignScale: geo.size.width < geo.size.height ? 2 : 1) {
                         Button {
                             engine.togglePause()
                         } label: {

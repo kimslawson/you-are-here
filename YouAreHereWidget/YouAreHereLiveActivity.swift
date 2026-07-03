@@ -10,7 +10,8 @@ struct YouAreHereLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: LocationActivityAttributes.self) { context in
             // Lock Screen / banner presentation.
-            WayfindingView(state: context.state, townSize: 40, alignment: .leading) {
+            WayfindingView(state: context.state, townSize: 40, alignment: .leading,
+                           speedSignScale: 2) {
                 pauseControl(isPaused: context.state.isPaused, size: 22)
             }
                 .padding(.horizontal, 18)

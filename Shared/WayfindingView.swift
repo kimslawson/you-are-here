@@ -11,6 +11,10 @@ struct WayfindingView<Trailing: View>: View {
     /// Base point size for the big town line. Small lines scale from this.
     var townSize: CGFloat = 64
     var alignment: HorizontalAlignment = .leading
+    /// Visual multiplier for the speed-limit sign. Cramped layouts (portrait,
+    /// Live Activity) pass 2: the sign renders bigger but keeps its normal
+    /// layout footprint, overflowing downward over the town line.
+    var speedSignScale: CGFloat = 1
     /// Optional control pinned to the trailing end of the altitude/heading line
     /// (e.g. the park/resume button).
     @ViewBuilder var trailing: () -> Trailing
@@ -26,6 +30,7 @@ struct WayfindingView<Trailing: View>: View {
     var body: some View {
         VStack(alignment: alignment, spacing: townSize * 0.06) {
             roadLine
+                .zIndex(1)   // the scaled-up speed sign overlaps the town line
             townLine
             metricsLine
         }
@@ -65,8 +70,11 @@ struct WayfindingView<Trailing: View>: View {
             }
             Spacer(minLength: smallSize * 0.5)
             if let limit = Formatting.speedLimitValue(kmh: state.speedLimitKmh, metric: state.unitIsMetric) {
-                SpeedLimitSign(value: limit, height: townSize * 0.5,
+                // Scaled up, the sign keeps its unscaled height in layout and
+                // spills below the road line (over the town line's trailing end).
+                SpeedLimitSign(value: limit, height: townSize * 0.5 * speedSignScale,
                                color: Theme.textColor(changed: state.speedLimitChanged, base: Theme.secondary))
+                    .frame(height: townSize * 0.5, alignment: .top)
             }
         }
         .lineLimit(1)
@@ -157,8 +165,10 @@ struct SpeedLimitSign: View {
 extension WayfindingView where Trailing == EmptyView {
     init(state: LocationActivityAttributes.ContentState,
          townSize: CGFloat = 64,
-         alignment: HorizontalAlignment = .leading) {
-        self.init(state: state, townSize: townSize, alignment: alignment, trailing: { EmptyView() })
+         alignment: HorizontalAlignment = .leading,
+         speedSignScale: CGFloat = 1) {
+        self.init(state: state, townSize: townSize, alignment: alignment,
+                  speedSignScale: speedSignScale, trailing: { EmptyView() })
     }
 }
 
