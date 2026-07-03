@@ -63,10 +63,12 @@ struct LocationActivityAttributes: ActivityAttributes {
         var speedLimitChanged: Bool
 
         /// Big-line text while no town is known, reflecting *why* it's unknown:
-        /// parked (not looking), offline, or actively locating.
+        /// parked (not looking), offline, or actively locating. ASCII periods,
+        /// not "…" — some bundled fonts ship empty glyphs for typographic
+        /// punctuation (see SeparatorDot).
         var townPlaceholder: String {
             if isPaused { return "Paused" }
-            return hasSignal ? "Locating…" : "No signal"
+            return hasSignal ? "Locating..." : "No signal"
         }
 
         static var placeholder: ContentState {

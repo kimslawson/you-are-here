@@ -59,9 +59,7 @@ struct WayfindingView<Trailing: View>: View {
                     Text(state.road)
                         .font(state.font(size: smallSize, weight: .medium))
                         .foregroundColor(routeColor)
-                    Text("·")
-                        .font(state.font(size: smallSize, weight: .medium))
-                        .foregroundColor(Theme.secondary)
+                    SeparatorDot(size: smallSize)
                 }
                 RouteShield(route: route, height: shieldHeight, color: routeColor,
                             family: state.appFont)
@@ -120,9 +118,7 @@ struct WayfindingView<Trailing: View>: View {
                     .foregroundColor(Theme.secondary)
             }
 
-            Text("·")
-                .font(state.font(size: smallSize, weight: .medium))
-                .foregroundColor(Theme.secondary)
+            SeparatorDot(size: smallSize)
 
             Label {
                 Text(Formatting.headingString(state.headingDegrees))
@@ -144,6 +140,21 @@ struct WayfindingView<Trailing: View>: View {
         }
         .lineLimit(1)
         .minimumScaleFactor(0.6)
+    }
+}
+
+/// Font-agnostic replacement for the "·" separator character: some bundled
+/// faces ship an *empty* middle-dot glyph (Overpass's static builds, for one),
+/// which renders as a silent gap. A drawn circle can't go missing.
+struct SeparatorDot: View {
+    /// Point size of the adjacent text; the dot scales from it.
+    var size: CGFloat
+    var color: Color = Theme.secondary
+
+    var body: some View {
+        Circle()
+            .fill(color)
+            .frame(width: size * 0.13, height: size * 0.13)
     }
 }
 

@@ -67,10 +67,7 @@ struct YouAreHereLiveActivity: Widget {
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     HStack(spacing: 6) {
-                        Text(roadText(context.state))
-                            .font(context.state.font(size: 13, weight: .medium))
-                            .foregroundColor(Theme.textColor(changed: context.state.roadChanged, base: Theme.secondary))
-                            .lineLimit(1)
+                        roadContent(context.state)
                         if !context.state.hasSignal {
                             Image(systemName: "wifi.slash").foregroundColor(Theme.muted).font(.system(size: 11))
                         }
@@ -121,12 +118,35 @@ struct YouAreHereLiveActivity: Widget {
         s.town.isEmpty ? "—" : s.town
     }
 
+    /// Road + optional route label, joined by the drawn dot (the "·" character
+    /// is an empty glyph in some bundled fonts — see SeparatorDot).
+    @ViewBuilder
+    private func roadContent(_ s: LocationActivityAttributes.ContentState) -> some View {
+        let color = Theme.textColor(changed: s.roadChanged, base: Theme.secondary)
+        if let route = s.route,
+           !RouteParser.roadIsJustRoute(road: s.road, route: route), !s.road.isEmpty {
+            Text(s.road)
+                .font(s.font(size: 13, weight: .medium))
+                .foregroundColor(color)
+                .lineLimit(1)
+            SeparatorDot(size: 13)
+            Text(Formatting.routeLabel(route))
+                .font(s.font(size: 13, weight: .medium))
+                .foregroundColor(color)
+                .lineLimit(1)
+        } else {
+            Text(roadText(s))
+                .font(s.font(size: 13, weight: .medium))
+                .foregroundColor(color)
+                .lineLimit(1)
+        }
+    }
+
     private func roadText(_ s: LocationActivityAttributes.ContentState) -> String {
         if let route = s.route {
-            if RouteParser.roadIsJustRoute(road: s.road, route: route) || s.road.isEmpty {
-                return Formatting.routeLabel(route)
-            }
-            return "\(s.road) · \(Formatting.routeLabel(route))"
+            // Separate road + route is handled by roadContent; here the route
+            // IS the road (or the road is unknown).
+            return Formatting.routeLabel(route)
         }
         return s.road.isEmpty ? "—" : s.road
     }
