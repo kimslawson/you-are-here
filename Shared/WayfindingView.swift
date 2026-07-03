@@ -75,7 +75,7 @@ struct WayfindingView<Trailing: View>: View {
 
     // MARK: Line 2 — town (the headline)
     private var townLine: some View {
-        Text(state.town.isEmpty ? (state.hasSignal ? "Locating…" : "No signal") : state.town)
+        Text(state.town.isEmpty ? state.townPlaceholder : state.town)
             .font(Theme.font(size: townSize, weight: .bold))
             .foregroundColor(Theme.textColor(changed: state.townChanged,
                                              base: state.town.isEmpty ? Theme.muted : Theme.primary))

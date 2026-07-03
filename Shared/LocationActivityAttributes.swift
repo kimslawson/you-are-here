@@ -56,6 +56,13 @@ struct LocationActivityAttributes: ActivityAttributes {
         var headingChanged: Bool
         var speedLimitChanged: Bool
 
+        /// Big-line text while no town is known, reflecting *why* it's unknown:
+        /// parked (not looking), offline, or actively locating.
+        var townPlaceholder: String {
+            if isPaused { return "Paused" }
+            return hasSignal ? "Locating…" : "No signal"
+        }
+
         static var placeholder: ContentState {
             ContentState(
                 town: "Truckee",

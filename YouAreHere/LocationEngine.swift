@@ -23,7 +23,8 @@ final class LocationEngine: NSObject, ObservableObject {
         townChanged: false, roadChanged: false, headingChanged: false, speedLimitChanged: false)
     @Published private(set) var authorization: CLAuthorizationStatus = .notDetermined
     @Published private(set) var isRunning = false
-    /// "Parked": sensors frozen to save battery. Persisted across launches.
+    /// "Parked": sensors frozen to save battery. Per-session only — a fresh
+    /// launch always starts live, never parked.
     @Published private(set) var isPaused = false
 
     // MARK: Collaborators
@@ -100,7 +101,6 @@ final class LocationEngine: NSObject, ObservableObject {
         manager.pausesLocationUpdatesAutomatically = false
         manager.headingOrientation = .portrait
         authorization = manager.authorizationStatus
-        isPaused = UserDefaults.standard.bool(forKey: SettingsKey.isPaused)
         refreshRate = RefreshRate.current()
         applyRefreshConfiguration()   // sets accuracy + distance/heading filters
         updateHeadingOrientation()
@@ -146,8 +146,8 @@ final class LocationEngine: NSObject, ObservableObject {
 
         startLiveActivity()
 
-        // Honor a persisted parked state across launches: don't power up the
-        // sensors, just show the frozen Live Activity.
+        // A pause set before start (the Live Activity button can park us after
+        // a cold launch): keep the sensors off, just show the frozen readout.
         if isPaused {
             pushFrozenState()
         } else {
@@ -165,13 +165,20 @@ final class LocationEngine: NSObject, ObservableObject {
     // MARK: Park / resume
 
     func togglePause() {
+        // The Live Activity button can cold-launch us with no session running.
+        // Pause is never persisted, so adopt whatever paused state the activity
+        // is currently showing — that's what the user tapped against — so the
+        // toggle goes the direction they expect.
+        if !isRunning, activity == nil,
+           let shown = Activity<LocationActivityAttributes>.activities.first?.content.state.isPaused {
+            isPaused = shown
+        }
         setPaused(!isPaused)
     }
 
     func setPaused(_ paused: Bool) {
         guard paused != isPaused else { return }
         isPaused = paused
-        UserDefaults.standard.set(paused, forKey: SettingsKey.isPaused)
 
         if paused {
             suspendSensors()
@@ -340,6 +347,16 @@ final class LocationEngine: NSObject, ObservableObject {
     /// flash flags. Used when parking/resuming so the Live Activity and on-screen
     /// UI flip the pause/play icon immediately without waiting for a tick.
     private func pushFrozenState() {
+        // Reconnect to a system-shown Activity if the pause intent cold-launched
+        // us, and adopt its content while ours is still blank — so the freeze
+        // keeps the readout the user was looking at instead of blanking it.
+        if activity == nil {
+            startLiveActivity()
+            if let shown = activity?.content.state, state.town.isEmpty, state.road.isEmpty {
+                state = shown
+            }
+        }
+
         var s = state
         s.isPaused = isPaused
         s.townChanged = false

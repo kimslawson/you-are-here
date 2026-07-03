@@ -107,7 +107,7 @@ struct YouAreHereLiveActivity: Widget {
     }
 
     private func displayTown(_ s: LocationActivityAttributes.ContentState) -> String {
-        s.town.isEmpty ? (s.hasSignal ? "Locating…" : "No signal") : s.town
+        s.town.isEmpty ? s.townPlaceholder : s.town
     }
 
     private func shortTown(_ s: LocationActivityAttributes.ContentState) -> String {

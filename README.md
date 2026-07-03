@@ -43,7 +43,9 @@ When the **town, road, or compass direction changes**, that field briefly
 - **Parked mode:** a pause/play button at the trailing end of the
   altitude/heading line (both on screen and in the Live Activity). Parking
   freezes the readout and powers down the sensors to save battery; the screen is
-  also allowed to sleep. It stays parked until you tap play (manual resume).
+  also allowed to sleep. It stays parked until you tap play (manual resume),
+  but parking is per-session: a fresh app launch always starts live. While
+  parked with no location yet, the big line reads "Paused" (not "Locating…").
   The Live Activity button is interactive on iOS 17+ (via an App Intent that
   runs in the app process and relaunches it if needed); on iOS 16 it shows the
   state but tapping opens the app instead.
