@@ -21,6 +21,9 @@ enum AppFont: String, CaseIterable, Identifiable, Codable {
     /// DIN 1451 Mittelschrift — German road signage — via its Roadgeek 2005
     /// recreation (same license), bundled. Single weight, like the real signs.
     case din1451
+    /// DIN 1451 Engschrift — the condensed variant (long names on narrow
+    /// signs) — same Roadgeek recreation and license. Single weight.
+    case din1451Eng
     /// Grotesque modeled on California highway signage (OFL), bundled.
     case barlow
     /// Airbus-commissioned cockpit-display face (OFL), bundled.
@@ -40,6 +43,7 @@ enum AppFont: String, CaseIterable, Identifiable, Codable {
         case .overpass:     return "Overpass"
         case .roadgeek:     return "Roadgeek 2005"
         case .din1451:      return "DIN 1451"
+        case .din1451Eng:   return "DIN 1451 Engschrift"
         case .barlow:       return "Barlow"
         case .b612:         return "B612"
         case .atkinson:     return "Atkinson Hyperlegible"
@@ -84,6 +88,8 @@ enum AppFont: String, CaseIterable, Identifiable, Codable {
         // German signs use a single weight; every SwiftUI weight maps to it.
         case .din1451:
             return "Roadgeek2005Mittelschrift"
+        case .din1451Eng:
+            return "Roadgeek2005Engschrift"
         case .barlow:
             switch weight {
             case .bold, .heavy, .black: return "Barlow-Bold"

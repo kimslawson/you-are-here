@@ -45,6 +45,8 @@ When the **town, road, or compass direction changes**, that field briefly
     (no commercial use).
   - **DIN 1451** — German road-signage standard, via its Roadgeek 2005
     Mittelschrift recreation (same license). Single weight, like the signs.
+  - **DIN 1451 Engschrift** — the condensed DIN variant (used for long names
+    on narrow signs), same Roadgeek recreation and license.
   - **Barlow** (OFL) — grotesque modeled on California highway signage.
   - **B612** (OFL) — commissioned by Airbus for cockpit displays; built for
     glanceable legibility on screens in vehicles.
