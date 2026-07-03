@@ -27,7 +27,8 @@ struct YouAreHereLiveActivity: Widget {
                 DynamicIslandExpandedRegion(.leading) {
                     if let route = context.state.route {
                         RouteShield(route: route, height: 26,
-                                    color: Theme.textColor(changed: context.state.roadChanged, base: Theme.secondary))
+                                    color: Theme.textColor(changed: context.state.roadChanged, base: Theme.secondary),
+                                    family: context.state.appFont)
                             .padding(.leading, 4)
                     } else {
                         Image(systemName: "road.lanes")
@@ -39,22 +40,23 @@ struct YouAreHereLiveActivity: Widget {
                         if let limit = Formatting.speedLimitValue(kmh: context.state.speedLimitKmh,
                                                                   metric: context.state.unitIsMetric) {
                             SpeedLimitSign(value: limit, height: 34,
-                                           color: Theme.textColor(changed: context.state.speedLimitChanged, base: Theme.secondary))
+                                           color: Theme.textColor(changed: context.state.speedLimitChanged, base: Theme.secondary),
+                                           family: context.state.appFont)
                         }
                         VStack(alignment: .trailing, spacing: 2) {
                             Text(Formatting.altitudeString(meters: context.state.altitudeMeters,
                                                            metric: context.state.unitIsMetric))
-                                .font(Theme.font(size: 13, weight: .medium))
+                                .font(context.state.font(size: 13, weight: .medium))
                                 .foregroundColor(Theme.secondary)
                             Text(Formatting.headingString(context.state.headingDegrees))
-                                .font(Theme.font(size: 13, weight: .medium))
+                                .font(context.state.font(size: 13, weight: .medium))
                                 .foregroundColor(Theme.textColor(changed: context.state.headingChanged, base: Theme.secondary))
                         }
                     }
                 }
                 DynamicIslandExpandedRegion(.center) {
                     Text(displayTown(context.state))
-                        .font(Theme.font(size: 22, weight: .bold))
+                        .font(context.state.font(size: 22, weight: .bold))
                         .foregroundColor(Theme.textColor(changed: context.state.townChanged, base: Theme.primary))
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
@@ -62,7 +64,7 @@ struct YouAreHereLiveActivity: Widget {
                 DynamicIslandExpandedRegion(.bottom) {
                     HStack(spacing: 6) {
                         Text(roadText(context.state))
-                            .font(Theme.font(size: 13, weight: .medium))
+                            .font(context.state.font(size: 13, weight: .medium))
                             .foregroundColor(Theme.textColor(changed: context.state.roadChanged, base: Theme.secondary))
                             .lineLimit(1)
                         if !context.state.hasSignal {
@@ -74,13 +76,13 @@ struct YouAreHereLiveActivity: Widget {
                 }
             } compactLeading: {
                 if let route = context.state.route {
-                    RouteShield(route: route, height: 20)
+                    RouteShield(route: route, height: 20, family: context.state.appFont)
                 } else {
                     Image(systemName: "location.fill").foregroundColor(Theme.primary)
                 }
             } compactTrailing: {
                 Text(shortTown(context.state))
-                    .font(Theme.font(size: 14, weight: .bold))
+                    .font(context.state.font(size: 14, weight: .bold))
                     .foregroundColor(Theme.textColor(changed: context.state.townChanged, base: Theme.primary))
                     .lineLimit(1)
                     .frame(maxWidth: 80)

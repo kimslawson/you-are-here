@@ -13,6 +13,7 @@ struct RouteShield: View {
     let route: RouteRef
     var height: CGFloat = 22
     var color: Color = Theme.primary
+    var family: AppFont = .helvetica
 
     /// What goes inside the marker.
     private var inner: String {
@@ -41,7 +42,7 @@ struct RouteShield: View {
         ZStack {
             ShieldShape().stroke(color, lineWidth: lineWidth)
             Text(inner)
-                .font(Theme.font(size: height * 0.5, weight: .bold))
+                .font(Theme.font(size: height * 0.5, weight: .bold, family: family))
                 .foregroundColor(color)
                 .padding(.top, height * 0.06)
                 .minimumScaleFactor(0.5)
@@ -52,7 +53,7 @@ struct RouteShield: View {
     // US / state: rounded-rect outline hugging the region text.
     private var box: some View {
         Text(inner)
-            .font(Theme.font(size: height * 0.46, weight: .bold))
+            .font(Theme.font(size: height * 0.46, weight: .bold, family: family))
             .foregroundColor(color)
             .minimumScaleFactor(0.5)
             .padding(.horizontal, height * 0.22)

@@ -9,5 +9,17 @@
 		<key>NSExtensionPointIdentifier</key>
 		<string>com.apple.widgetkit-extension</string>
 	</dict>
+
+	<!-- Bundled UI typefaces — the widget renders in its own process, so the
+	     fonts must be registered here too (Settings > Font in the app). -->
+	<key>UIAppFonts</key>
+	<array>
+		<string>FSMillbankWeb.ttf</string>
+		<string>FSMillbankWeb-Bold.ttf</string>
+		<string>Overpass-Regular.ttf</string>
+		<string>Overpass-Medium.ttf</string>
+		<string>Overpass-SemiBold.ttf</string>
+		<string>Overpass-Bold.ttf</string>
+	</array>
 </dict>
 </plist>

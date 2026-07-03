@@ -9,6 +9,15 @@ enum SettingsKey {
     static let onlineRouteLookup = "onlineRouteLookup"
     static let showSpeedLimit = "showSpeedLimit"
     static let pictureInPicture = "pictureInPicture"
+    static let appFont = "appFont"
+}
+
+extension AppFont {
+    /// The user's chosen typeface. Lives here (app target) because only the app
+    /// process reads UserDefaults — the widget gets the choice via ContentState.
+    static func current(_ defaults: UserDefaults = .standard) -> AppFont {
+        defaults.string(forKey: SettingsKey.appFont).flatMap(AppFont.init(rawValue:)) ?? .helvetica
+    }
 }
 
 extension UserDefaults {

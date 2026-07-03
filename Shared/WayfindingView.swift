@@ -53,19 +53,20 @@ struct WayfindingView<Trailing: View>: View {
             if let route = state.route {
                 if showSeparateRoad && !state.road.isEmpty {
                     Text(state.road)
-                        .font(Theme.font(size: smallSize, weight: .medium))
+                        .font(state.font(size: smallSize, weight: .medium))
                         .foregroundColor(routeColor)
                     Text("·")
-                        .font(Theme.font(size: smallSize, weight: .medium))
+                        .font(state.font(size: smallSize, weight: .medium))
                         .foregroundColor(Theme.secondary)
                 }
-                RouteShield(route: route, height: shieldHeight, color: routeColor)
+                RouteShield(route: route, height: shieldHeight, color: routeColor,
+                            family: state.appFont)
                 Text(Formatting.routeLabel(route))
-                    .font(Theme.font(size: smallSize, weight: .semibold))
+                    .font(state.font(size: smallSize, weight: .semibold))
                     .foregroundColor(routeColor)
             } else {
                 Text(state.road.isEmpty ? "—" : state.road)
-                    .font(Theme.font(size: smallSize, weight: .medium))
+                    .font(state.font(size: smallSize, weight: .medium))
                     .foregroundColor(Theme.textColor(changed: state.roadChanged, base: Theme.secondary))
             }
             Spacer(minLength: smallSize * 0.5)
@@ -73,7 +74,8 @@ struct WayfindingView<Trailing: View>: View {
                 // Scaled up, the sign keeps its unscaled height in layout and
                 // spills below the road line (over the town line's trailing end).
                 SpeedLimitSign(value: limit, height: townSize * 0.5 * speedSignScale,
-                               color: Theme.textColor(changed: state.speedLimitChanged, base: Theme.secondary))
+                               color: Theme.textColor(changed: state.speedLimitChanged, base: Theme.secondary),
+                               family: state.appFont)
                     .frame(height: townSize * 0.5, alignment: .top)
             }
         }
@@ -84,7 +86,7 @@ struct WayfindingView<Trailing: View>: View {
     // MARK: Line 2 — town (the headline)
     private var townLine: some View {
         Text(state.town.isEmpty ? state.townPlaceholder : state.town)
-            .font(Theme.font(size: townSize, weight: .bold))
+            .font(state.font(size: townSize, weight: .bold))
             .foregroundColor(Theme.textColor(changed: state.townChanged,
                                              base: state.town.isEmpty ? Theme.muted : Theme.primary))
             .lineLimit(1)
@@ -97,7 +99,7 @@ struct WayfindingView<Trailing: View>: View {
         HStack(spacing: smallSize * 0.6) {
             Label {
                 Text(Formatting.altitudeString(meters: state.altitudeMeters, metric: state.unitIsMetric))
-                    .font(Theme.font(size: smallSize, weight: .medium))
+                    .font(state.font(size: smallSize, weight: .medium))
                     .foregroundColor(Theme.secondary)
             } icon: {
                 Image(systemName: "mountain.2.fill")
@@ -106,12 +108,12 @@ struct WayfindingView<Trailing: View>: View {
             }
 
             Text("·")
-                .font(Theme.font(size: smallSize, weight: .medium))
+                .font(state.font(size: smallSize, weight: .medium))
                 .foregroundColor(Theme.secondary)
 
             Label {
                 Text(Formatting.headingString(state.headingDegrees))
-                    .font(Theme.font(size: smallSize, weight: .medium))
+                    .font(state.font(size: smallSize, weight: .medium))
                     .foregroundColor(Theme.textColor(changed: state.headingChanged, base: Theme.secondary))
             } icon: {
                 CompassArrow(degrees: state.headingContinuous,
@@ -139,13 +141,14 @@ struct SpeedLimitSign: View {
     let value: Int
     var height: CGFloat
     var color: Color = Theme.secondary
+    var family: AppFont = .helvetica
 
     var body: some View {
         VStack(spacing: height * 0.015) {
-            Text("SPEED").font(Theme.font(size: height * 0.15, weight: .semibold))
-            Text("LIMIT").font(Theme.font(size: height * 0.15, weight: .semibold))
+            Text("SPEED").font(Theme.font(size: height * 0.15, weight: .semibold, family: family))
+            Text("LIMIT").font(Theme.font(size: height * 0.15, weight: .semibold, family: family))
             Text("\(value)")
-                .font(Theme.font(size: height * 0.42, weight: .bold))
+                .font(Theme.font(size: height * 0.42, weight: .bold, family: family))
                 .padding(.top, height * 0.02)
         }
         .foregroundColor(color)

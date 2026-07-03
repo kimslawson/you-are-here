@@ -40,6 +40,8 @@ struct LocationActivityAttributes: ActivityAttributes {
         /// Whether the user prefers metric. Carried in state so the widget
         /// renders correctly without needing a shared app group.
         var unitIsMetric: Bool
+        /// Chosen UI typeface (`AppFont` raw value); carried for the same reason.
+        var fontID: String
         /// False when we have no network and names are stale.
         var hasSignal: Bool
         /// True when "parked" — sensors are frozen to save battery.
@@ -72,6 +74,7 @@ struct LocationActivityAttributes: ActivityAttributes {
                 headingDegrees: 305,
                 headingContinuous: 305,
                 unitIsMetric: false,
+                fontID: AppFont.helvetica.rawValue,
                 hasSignal: true,
                 isPaused: false,
                 speedLimitKmh: 72,

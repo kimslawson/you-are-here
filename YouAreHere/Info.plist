@@ -23,6 +23,17 @@
 	<key>NSMotionUsageDescription</key>
 	<string>Uses the barometer for smooth, accurate altitude.</string>
 
+	<!-- Bundled UI typefaces (Settings > Font) -->
+	<key>UIAppFonts</key>
+	<array>
+		<string>FSMillbankWeb.ttf</string>
+		<string>FSMillbankWeb-Bold.ttf</string>
+		<string>Overpass-Regular.ttf</string>
+		<string>Overpass-Medium.ttf</string>
+		<string>Overpass-SemiBold.ttf</string>
+		<string>Overpass-Bold.ttf</string>
+	</array>
+
 	<!-- location: keep updates flowing in the background for the Live Activity.
 	     audio: "Audio, AirPlay, and Picture in Picture" — required for the
 	     opt-in floating-window (PiP) feature. -->

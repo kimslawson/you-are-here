@@ -99,10 +99,10 @@ struct ContentView: View {
                 .font(.system(size: 44))
                 .foregroundColor(Theme.muted)
             Text("Location access is off")
-                .font(Theme.font(size: 22, weight: .bold))
+                .font(engine.state.font(size: 22, weight: .bold))
                 .foregroundColor(Theme.primary)
             Text("You Are Here needs your location to name the town, road, and heading around you.")
-                .font(Theme.font(size: 15, weight: .regular))
+                .font(engine.state.font(size: 15, weight: .regular))
                 .foregroundColor(Theme.secondary)
                 .multilineTextAlignment(.center)
             Button("Open Settings") {
@@ -110,7 +110,7 @@ struct ContentView: View {
                     UIApplication.shared.open(url)
                 }
             }
-            .font(Theme.font(size: 16, weight: .semibold))
+            .font(engine.state.font(size: 16, weight: .semibold))
             .foregroundColor(.black)
             .padding(.horizontal, 20).padding(.vertical, 10)
             .background(Theme.primary)
@@ -128,10 +128,27 @@ struct SettingsView: View {
     @AppStorage(SettingsKey.onlineRouteLookup) private var onlineRouteLookup = false
     @AppStorage(SettingsKey.showSpeedLimit) private var showSpeedLimit = false
     @AppStorage(SettingsKey.pictureInPicture) private var pictureInPicture = false
+    @AppStorage(SettingsKey.appFont) private var appFont = AppFont.helvetica.rawValue
 
     var body: some View {
         NavigationStack {
             Form {
+                Section("Font") {
+                    Picker("Font", selection: $appFont) {
+                        ForEach(AppFont.allCases) { family in
+                            // Each option previews in its own face.
+                            Text(family.label)
+                                .font(Theme.font(size: 17, weight: .medium, family: family))
+                                .tag(family.rawValue)
+                        }
+                    }
+                    .pickerStyle(.inline)
+                    .labelsHidden()
+                    .onChange(of: appFont) { _ in engine.reloadFont() }
+                    Text("Used across the app, the Live Activity, and the floating window. FS Millbank is a wayfinding face by Fontsmith; Overpass is an open-source take on U.S. highway signage lettering.")
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                }
                 Section("Units") {
                     Picker("Units", selection: $unitIsMetric) {
                         Text("Imperial (ft)").tag(false)

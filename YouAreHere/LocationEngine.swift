@@ -19,7 +19,8 @@ final class LocationEngine: NSObject, ObservableObject {
     @Published private(set) var state = LocationActivityAttributes.ContentState(
         town: "", road: "", route: nil, altitudeMeters: nil, headingDegrees: nil,
         headingContinuous: nil,
-        unitIsMetric: false, hasSignal: true, isPaused: false, speedLimitKmh: nil,
+        unitIsMetric: false, fontID: AppFont.current().rawValue,
+        hasSignal: true, isPaused: false, speedLimitKmh: nil,
         townChanged: false, roadChanged: false, headingChanged: false, speedLimitChanged: false)
     @Published private(set) var authorization: CLAuthorizationStatus = .notDetermined
     @Published private(set) var isRunning = false
@@ -245,6 +246,12 @@ final class LocationEngine: NSObject, ObservableObject {
         applyRefreshConfiguration()
     }
 
+    /// Re-read the user's font choice and push it to the screen, Live Activity,
+    /// and PiP immediately (works while parked too — no tick needed).
+    func reloadFont() {
+        pushFrozenState()
+    }
+
     private func suspendSensors() {
         manager.stopUpdatingLocation()
         manager.stopUpdatingHeading()
@@ -326,7 +333,8 @@ final class LocationEngine: NSObject, ObservableObject {
             town: town, road: road, route: route,
             altitudeMeters: altitude, headingDegrees: heading,
             headingContinuous: continuousHeading,
-            unitIsMetric: metric, hasSignal: networkAvailable, isPaused: false,
+            unitIsMetric: metric, fontID: AppFont.current().rawValue,
+            hasSignal: networkAvailable, isPaused: false,
             speedLimitKmh: speedKmh,
             townChanged: townChanged, roadChanged: roadChanged, headingChanged: headingChanged,
             speedLimitChanged: speedChanged)
@@ -359,6 +367,7 @@ final class LocationEngine: NSObject, ObservableObject {
 
         var s = state
         s.isPaused = isPaused
+        s.fontID = AppFont.current().rawValue   // apply font changes even while parked
         s.townChanged = false
         s.roadChanged = false
         s.headingChanged = false

@@ -26,9 +26,19 @@ When the **town, road, or compass direction changes**, that field briefly
 
 ## Design notes
 
-- **Font:** Helvetica Neue (bundled on iOS) — a neo-grotesque in the lineage of
-  road/transit signage, picked for glanceable wayfinding. Change one constant
-  (`Theme.family`) to fall back to the system font (SF Pro).
+- **Font:** user-selectable (*Settings ▸ Font*), applied across the app screen,
+  Live Activity, and floating window — the choice travels to the widget process
+  inside `ContentState.fontID` (no App Group). Options (`AppFont` in
+  `Shared/Theme.swift`):
+  - **Helvetica Neue** (default; ships with iOS) — a neo-grotesque in the
+    lineage of road/transit signage, picked for glanceable wayfinding.
+  - **San Francisco** — the system font (SF Pro).
+  - **FS Millbank** — Fontsmith's wayfinding face (designed for UK signage
+    programmes). ⚠️ Commercial font: the Regular/Bold TTFs in `Shared/Fonts/`
+    are bundled under the repo owner's license and must not be redistributed —
+    remove them if this repo is ever made public / forked.
+  - **Overpass** — open-source (SIL OFL) digitization of U.S. Highway Gothic,
+    fetched from Google Fonts; four weights bundled in `Shared/Fonts/`.
 - **Palette:** bright off-white text on true black for contrast and OLED
   comfort; pure white for the change-flash. Centralized in `Shared/Theme.swift`.
 - **Units:** Imperial by default, with an in-app Imperial/Metric toggle.
