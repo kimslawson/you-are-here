@@ -15,6 +15,12 @@ enum AppFont: String, CaseIterable, Identifiable, Codable {
     case fsMillbank
     /// Open-source (OFL) digitization of U.S. Highway Gothic, bundled.
     case overpass
+    /// Michael Adams' recreations of the FHWA sign series (freeware,
+    /// non-commercial), bundled: Series D + E + E Modified.
+    case roadgeek
+    /// DIN 1451 Mittelschrift — German road signage — via its Roadgeek 2005
+    /// recreation (same license), bundled. Single weight, like the real signs.
+    case din1451
     /// Grotesque modeled on California highway signage (OFL), bundled.
     case barlow
     /// Airbus-commissioned cockpit-display face (OFL), bundled.
@@ -32,6 +38,8 @@ enum AppFont: String, CaseIterable, Identifiable, Codable {
         case .sanFrancisco: return "San Francisco"
         case .fsMillbank:   return "FS Millbank"
         case .overpass:     return "Overpass"
+        case .roadgeek:     return "Roadgeek 2005"
+        case .din1451:      return "DIN 1451"
         case .barlow:       return "Barlow"
         case .b612:         return "B612"
         case .atkinson:     return "Atkinson Hyperlegible"
@@ -65,6 +73,17 @@ enum AppFont: String, CaseIterable, Identifiable, Codable {
             case .medium:               return "Overpass-Medium"
             default:                    return "Overpass-Regular"
             }
+        // FHWA "weights" are really widths: D (narrow) for the small lines,
+        // E for semibold accents, E Modified (the interstate face) for bold.
+        case .roadgeek:
+            switch weight {
+            case .bold, .heavy, .black: return "Roadgeek2005SeriesEM"
+            case .semibold:             return "Roadgeek2005SeriesE"
+            default:                    return "Roadgeek2005SeriesD"
+            }
+        // German signs use a single weight; every SwiftUI weight maps to it.
+        case .din1451:
+            return "Roadgeek2005Mittelschrift"
         case .barlow:
             switch weight {
             case .bold, .heavy, .black: return "Barlow-Bold"

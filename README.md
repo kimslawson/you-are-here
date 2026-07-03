@@ -39,6 +39,12 @@ When the **town, road, or compass direction changes**, that field briefly
     remove them if this repo is ever made public / forked.
   - **Overpass** — open-source (SIL OFL) digitization of U.S. Highway Gothic,
     fetched from Google Fonts; four weights bundled in `Shared/Fonts/`.
+  - **Roadgeek 2005** — Michael Adams' recreations of the FHWA highway-sign
+    series (Series D for small lines, E/E-Modified for emphasis). Freeware for
+    recreational use; license bundled at `Shared/Fonts/Roadgeek-License.txt`
+    (no commercial use).
+  - **DIN 1451** — German road-signage standard, via its Roadgeek 2005
+    Mittelschrift recreation (same license). Single weight, like the signs.
   - **Barlow** (OFL) — grotesque modeled on California highway signage.
   - **B612** (OFL) — commissioned by Airbus for cockpit displays; built for
     glanceable legibility on screens in vehicles.
