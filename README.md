@@ -61,6 +61,9 @@ When the **town, road, or compass direction changes**, that field briefly
   anywhere this workspace's network could reach — drop-in candidates later.)
 - **Palette:** bright off-white text on true black for contrast and OLED
   comfort; pure white for the change-flash. Centralized in `Shared/Theme.swift`.
+- **Settings gear:** always visible in portrait. In landscape it shares the
+  top-right corner with the speed-limit sign, so it auto-hides — tap anywhere
+  to reveal it for a few seconds.
 - **Units:** Imperial by default, with an in-app Imperial/Metric toggle.
 - **Update rate:** 1s (default) / 2s / 5s / 10s. This isn't just a UI cadence —
   it's a power profile: slower rates also relax GPS accuracy and the

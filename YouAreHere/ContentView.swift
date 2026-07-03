@@ -9,28 +9,33 @@ struct ContentView: View {
     @AppStorage(SettingsKey.pictureInPicture) private var pictureInPicture = false
     @StateObject private var pip = PiPManager()
     @State private var showSettings = false
+    /// Landscape-only: the gear is hidden until a tap reveals it (it shares the
+    /// top-right corner with the speed-limit sign there). Portrait always shows it.
+    @State private var chromeVisible = false
+    @State private var chromeHideTask: Task<Void, Never>?
 
     var body: some View {
-        ZStack {
-            Theme.background.ignoresSafeArea()
+        GeometryReader { geo in
+            let isPortrait = geo.size.height >= geo.size.width
+            ZStack {
+                Theme.background.ignoresSafeArea()
 
-            // Offscreen-ish host for the PiP video layer (must be in the
-            // hierarchy for AVKit to float it).
-            PiPHostView(manager: pip)
-                .frame(width: 1, height: 1)
-                .opacity(0.01)
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
+                // Offscreen-ish host for the PiP video layer (must be in the
+                // hierarchy for AVKit to float it).
+                PiPHostView(manager: pip)
+                    .frame(width: 1, height: 1)
+                    .opacity(0.01)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
 
-            if needsPermission {
-                permissionPrompt
-            } else {
-                GeometryReader { geo in
+                if needsPermission {
+                    permissionPrompt
+                } else {
                     WayfindingView(state: engine.state,
                                    townSize: townSize(for: geo.size),
                                    alignment: .leading,
                                    // Portrait is cramped; double the speed sign.
-                                   speedSignScale: geo.size.width < geo.size.height ? 2 : 1) {
+                                   speedSignScale: isPortrait ? 2 : 1) {
                         Button {
                             engine.togglePause()
                         } label: {
@@ -42,22 +47,29 @@ struct ContentView: View {
                     .frame(width: geo.size.width, height: geo.size.height, alignment: .leading)
                     .animation(.easeOut(duration: 0.25), value: engine.state)
                 }
-            }
 
-            // Tap-anywhere settings affordance.
-            VStack {
-                HStack {
-                    Spacer()
-                    Button {
-                        showSettings = true
-                    } label: {
-                        Image(systemName: "gearshape")
-                            .font(.system(size: 20, weight: .semibold))
-                            .foregroundColor(Theme.secondary.opacity(0.6))
-                            .padding(16)
+                // Settings gear, top-right.
+                let showGear = isPortrait || chromeVisible
+                VStack {
+                    HStack {
+                        Spacer()
+                        Button {
+                            showSettings = true
+                        } label: {
+                            Image(systemName: "gearshape")
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundColor(Theme.secondary.opacity(0.6))
+                                .padding(16)
+                        }
+                        .opacity(showGear ? 1 : 0)
+                        .allowsHitTesting(showGear)
                     }
+                    Spacer()
                 }
-                Spacer()
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                if !isPortrait { revealChrome() }
             }
         }
         .onAppear {
@@ -86,6 +98,17 @@ struct ContentView: View {
 
     private var needsPermission: Bool {
         engine.authorization == .denied || engine.authorization == .restricted
+    }
+
+    /// Show the auto-hiding chrome (landscape gear) and re-arm its fade-out.
+    private func revealChrome() {
+        withAnimation(.easeIn(duration: 0.15)) { chromeVisible = true }
+        chromeHideTask?.cancel()
+        chromeHideTask = Task {
+            try? await Task.sleep(nanoseconds: 4_000_000_000)
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeOut(duration: 0.4)) { chromeVisible = false }
+        }
     }
 
     private func townSize(for size: CGSize) -> CGFloat {
