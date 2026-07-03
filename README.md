@@ -39,6 +39,18 @@ When the **town, road, or compass direction changes**, that field briefly
     remove them if this repo is ever made public / forked.
   - **Overpass** — open-source (SIL OFL) digitization of U.S. Highway Gothic,
     fetched from Google Fonts; four weights bundled in `Shared/Fonts/`.
+  - **Barlow** (OFL) — grotesque modeled on California highway signage.
+  - **B612** (OFL) — commissioned by Airbus for cockpit displays; built for
+    glanceable legibility on screens in vehicles.
+  - **Atkinson Hyperlegible** (OFL) — Braille Institute face engineered for
+    maximum character disambiguation.
+  - **Inter** (OFL) — the workhorse open screen grotesque.
+
+  All OFL fonts were fetched from Google Fonts. Adding another family: drop
+  TTFs in `Shared/Fonts/`, add an `AppFont` case with a weight→face map (use
+  PostScript names), and list the files under `UIAppFonts` in *both*
+  Info.plists. (DIN 1451 and Roadgeek 2005 were wanted but aren't hosted
+  anywhere this workspace's network could reach — drop-in candidates later.)
 - **Palette:** bright off-white text on true black for contrast and OLED
   comfort; pure white for the change-flash. Centralized in `Shared/Theme.swift`.
 - **Units:** Imperial by default, with an in-app Imperial/Metric toggle.

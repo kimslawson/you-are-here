@@ -15,6 +15,14 @@ enum AppFont: String, CaseIterable, Identifiable, Codable {
     case fsMillbank
     /// Open-source (OFL) digitization of U.S. Highway Gothic, bundled.
     case overpass
+    /// Grotesque modeled on California highway signage (OFL), bundled.
+    case barlow
+    /// Airbus-commissioned cockpit-display face (OFL), bundled.
+    case b612
+    /// Braille Institute's maximum-disambiguation face (OFL), bundled.
+    case atkinson
+    /// The workhorse open-source screen grotesque (OFL), bundled.
+    case inter
 
     var id: String { rawValue }
 
@@ -24,6 +32,10 @@ enum AppFont: String, CaseIterable, Identifiable, Codable {
         case .sanFrancisco: return "San Francisco"
         case .fsMillbank:   return "FS Millbank"
         case .overpass:     return "Overpass"
+        case .barlow:       return "Barlow"
+        case .b612:         return "B612"
+        case .atkinson:     return "Atkinson Hyperlegible"
+        case .inter:        return "Inter"
         }
     }
 
@@ -52,6 +64,31 @@ enum AppFont: String, CaseIterable, Identifiable, Codable {
             case .semibold:             return "Overpass-SemiBold"
             case .medium:               return "Overpass-Medium"
             default:                    return "Overpass-Regular"
+            }
+        case .barlow:
+            switch weight {
+            case .bold, .heavy, .black: return "Barlow-Bold"
+            case .semibold:             return "Barlow-SemiBold"
+            case .medium:               return "Barlow-Medium"
+            default:                    return "Barlow-Regular"
+            }
+        case .inter:
+            switch weight {
+            case .bold, .heavy, .black: return "Inter-Bold"
+            case .semibold:             return "Inter-SemiBold"
+            case .medium:               return "Inter-Medium"
+            default:                    return "Inter-Regular"
+            }
+        // Two-weight families: Regular carries the small lines, Bold the rest.
+        case .b612:
+            switch weight {
+            case .bold, .heavy, .black, .semibold: return "B612-Bold"
+            default:                               return "B612-Regular"
+            }
+        case .atkinson:
+            switch weight {
+            case .bold, .heavy, .black, .semibold: return "AtkinsonHyperlegible-Bold"
+            default:                               return "AtkinsonHyperlegible-Regular"
             }
         }
     }

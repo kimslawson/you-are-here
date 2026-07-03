@@ -20,6 +20,18 @@
 		<string>Overpass-Medium.ttf</string>
 		<string>Overpass-SemiBold.ttf</string>
 		<string>Overpass-Bold.ttf</string>
+		<string>Barlow-Regular.ttf</string>
+		<string>Barlow-Medium.ttf</string>
+		<string>Barlow-SemiBold.ttf</string>
+		<string>Barlow-Bold.ttf</string>
+		<string>Inter-Regular.ttf</string>
+		<string>Inter-Medium.ttf</string>
+		<string>Inter-SemiBold.ttf</string>
+		<string>Inter-Bold.ttf</string>
+		<string>B612-Regular.ttf</string>
+		<string>B612-Bold.ttf</string>
+		<string>AtkinsonHyperlegible-Regular.ttf</string>
+		<string>AtkinsonHyperlegible-Bold.ttf</string>
 	</array>
 </dict>
 </plist>
