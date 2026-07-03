@@ -16,11 +16,14 @@ struct RoadInfo {
 /// protocol; today it's backed by OpenStreetMap via the Overpass API (online,
 /// opt-in — it sends the coordinate to a third-party server).
 protocol RoadInfoResolver {
-    func roadInfo(near location: CLLocation) async throws -> RoadInfo
+    /// `roadName` is the geocoded name of the road we believe we're on; the
+    /// resolver uses it to avoid attributing a nearby road's info to us.
+    func roadInfo(near location: CLLocation, matching roadName: String?) async throws -> RoadInfo
 }
 
-/// Reads the nearest drivable OSM way and pulls its `ref` (route number) and
-/// `maxspeed` (speed limit) tags via Overpass.
+/// Reads nearby drivable OSM ways via Overpass, picks the one matching the
+/// geocoded road name (nearest as tie-break), and pulls its `ref` (route
+/// number) and `maxspeed` (speed limit) tags.
 ///
 /// Usage is deliberately sparse — `LocationEngine` only calls this when the road
 /// *changes* — to stay well within Overpass's fair-use limits.
@@ -29,7 +32,7 @@ struct OverpassRoadInfoResolver: RoadInfoResolver {
     private let radius = 40
     private let endpoint = URL(string: "https://overpass-api.de/api/interpreter")!
 
-    func roadInfo(near location: CLLocation) async throws -> RoadInfo {
+    func roadInfo(near location: CLLocation, matching roadName: String?) async throws -> RoadInfo {
         let lat = location.coordinate.latitude
         let lon = location.coordinate.longitude
         // Nearby drivable ways (exclude paths/footways/etc.), with geometry so we
@@ -55,17 +58,67 @@ struct OverpassRoadInfoResolver: RoadInfoResolver {
 
         let decoded = try JSONDecoder().decode(OverpassResponse.self, from: data)
 
-        // The way whose geometry passes closest to us is the road we're on.
-        var nearest: (dist: CLLocationDistance, el: Element)?
-        for element in decoded.elements where element.geometry?.isEmpty == false {
-            let d = element.minDistance(to: location)
-            if nearest == nil || d < nearest!.dist { nearest = (d, element) }
+        let ways = decoded.elements.filter { $0.geometry?.isEmpty == false }
+        guard let tags = pickWay(from: ways, matching: roadName, at: location)?.tags else {
+            return RoadInfo()
         }
-        guard let tags = nearest?.el.tags else { return RoadInfo() }
 
         return RoadInfo(route: tags.ref.flatMap(parse(osmRef:)),
                         speedLimitKmh: tags.maxspeed.flatMap(parseMaxspeed))
     }
+
+    /// Choose the way that is most plausibly the road we're on. Distance alone
+    /// isn't enough: right after a turn, the *previous* road's geometry is often
+    /// still the closest thing in the radius, and its route number would get
+    /// pinned to the new road (and cached until the next road change). The
+    /// geocoded road name arbitrates:
+    ///   - ways whose OSM name or ref matches it win (nearest among them);
+    ///   - if nearby ways are named but none match, return nothing rather than
+    ///     guess a neighbor's info;
+    ///   - only when no way is named at all fall back to plain nearest.
+    private func pickWay(from ways: [Element], matching roadName: String?, at location: CLLocation) -> Element? {
+        func nearest(_ candidates: [Element]) -> Element? {
+            candidates.min { $0.minDistance(to: location) < $1.minDistance(to: location) }
+        }
+        guard let target = Self.normalizedRoadName(roadName) else { return nearest(ways) }
+
+        let identified = ways.filter { !identifiers(of: $0).isEmpty }
+        let matches = identified.filter { identifiers(of: $0).contains(target) }
+        if !matches.isEmpty { return nearest(matches) }
+        return identified.isEmpty ? nearest(ways) : nil
+    }
+
+    /// Normalized strings a way answers to: its name plus each `ref` entry
+    /// ("US 1;ME 73" → "us 1", "me 73"). Refs count as names because Apple
+    /// sometimes labels a road *by* its route (thoroughfare "ME-73").
+    private func identifiers(of way: Element) -> Set<String> {
+        var ids = Set<String>()
+        if let n = Self.normalizedRoadName(way.tags?.name) { ids.insert(n) }
+        for ref in way.tags?.ref?.split(separator: ";") ?? [] {
+            if let n = Self.normalizedRoadName(String(ref)) { ids.insert(n) }
+        }
+        return ids
+    }
+
+    /// Canonicalize a road name for comparison across sources: Apple abbreviates
+    /// ("Westbrook St") where OSM spells out ("Westbrook Street"). Lowercases,
+    /// drops periods, and maps common suffix/direction words to their short form.
+    private static func normalizedRoadName(_ name: String?) -> String? {
+        guard let name else { return nil }
+        let cleaned = name.lowercased().replacingOccurrences(of: ".", with: "")
+        let tokens = cleaned.split(whereSeparator: { $0.isWhitespace || $0 == "-" })
+            .map { abbreviations[String($0)] ?? String($0) }
+        let result = tokens.joined(separator: " ")
+        return result.isEmpty ? nil : result
+    }
+
+    private static let abbreviations: [String: String] = [
+        "street": "st", "road": "rd", "drive": "dr", "avenue": "ave",
+        "boulevard": "blvd", "lane": "ln", "court": "ct", "place": "pl",
+        "terrace": "ter", "circle": "cir", "parkway": "pkwy", "highway": "hwy",
+        "trail": "trl", "square": "sq", "turnpike": "tpke", "crossing": "xing",
+        "route": "rte", "north": "n", "south": "s", "east": "e", "west": "w",
+    ]
 
     /// Parse an OSM `ref` ("ME 131", "US 1", "I 80"); may list several
     /// ("US 1;ME 131"). Reuses `RouteParser`, which prefers Interstate > US >
@@ -99,6 +152,7 @@ private struct OverpassResponse: Decodable {
 
 private struct Element: Decodable {
     struct Tags: Decodable {
+        let name: String?
         let ref: String?
         let maxspeed: String?
     }

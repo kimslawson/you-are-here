@@ -210,7 +210,9 @@ python3 design/appicon.py   # rewrites YouAreHere/Assets.xcassets/AppIcon.appico
   us nothing to show a shield from. Two paths fill this in:
   - **Online lookup (opt-in).** *Settings ▸ Route numbers ▸ Look up online.* When
     Apple gives a plain street name, the app queries OpenStreetMap (Overpass) for
-    the nearest road's route `ref` and shows the shield (see
+    nearby ways, picks the one whose OSM name matches the geocoded road (nearest
+    as tie-break — plain nearest would pin the *previous* road's number to a road
+    you just turned onto), and shows its route `ref` as the shield (see
     `RouteRefResolver.swift`, `RoadInfoResolver`). It's **off by default** because
     it sends your coordinate to a third-party server (`overpass-api.de`) and needs
     a network connection — so it won't help in the no-signal areas this app is

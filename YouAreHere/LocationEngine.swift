@@ -428,7 +428,7 @@ final class LocationEngine: NSObject, ObservableObject {
         Task { [weak self] in
             guard let self else { return }
             defer { Task { @MainActor in self.roadInfoInFlight = false } }
-            let info = (try? await self.roadInfoResolver.roadInfo(near: target)) ?? RoadInfo()
+            let info = (try? await self.roadInfoResolver.roadInfo(near: target, matching: road)) ?? RoadInfo()
             await MainActor.run {
                 // Record the result against the road so we don't re-query it,
                 // whether or not we found anything.
