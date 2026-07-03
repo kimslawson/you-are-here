@@ -64,6 +64,15 @@ final class PiPManager: NSObject, ObservableObject {
         if on { activate() } else { deactivate() }
     }
 
+    /// The system starts PiP automatically when the app is backgrounded, but it
+    /// does NOT stop it when the app returns to the foreground (e.g. via the
+    /// Live Activity or the app icon) — the floating window would sit on top of
+    /// the full-screen app showing the same thing. Call on scene activation.
+    func dismissForForeground() {
+        guard let controller, controller.isPictureInPictureActive else { return }
+        controller.stopPictureInPicture()
+    }
+
     private func activate() {
         guard controller == nil, let displayLayer,
               AVPictureInPictureController.isPictureInPictureSupported() else { return }

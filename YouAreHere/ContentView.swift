@@ -5,6 +5,7 @@ import CoreLocation
 /// display. Keeps the screen awake so it can ride on the dashboard.
 struct ContentView: View {
     @EnvironmentObject private var engine: LocationEngine
+    @Environment(\.scenePhase) private var scenePhase
     @AppStorage(SettingsKey.unitIsMetric) private var unitIsMetric = false
     @AppStorage(SettingsKey.pictureInPicture) private var pictureInPicture = false
     @StateObject private var pip = PiPManager()
@@ -85,6 +86,12 @@ struct ContentView: View {
         }
         .onChange(of: pictureInPicture) { enabled in
             pip.setEnabled(enabled)
+        }
+        .onChange(of: scenePhase) { phase in
+            // Back in the foreground (app icon, Live Activity tap, PiP restore
+            // button): the full app is showing, so the floating window is
+            // redundant — dismiss it.
+            if phase == .active { pip.dismissForForeground() }
         }
         .onDisappear {
             UIApplication.shared.isIdleTimerDisabled = false
