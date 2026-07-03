@@ -51,6 +51,18 @@ enum AppFont: String, CaseIterable, Identifiable, Codable {
         }
     }
 
+    /// Optical vertical correction for the big town line, as a fraction of the
+    /// town point size (negative = up). Metric centering leaves title-case
+    /// names looking high-set (see WayfindingView.townLine), so most families
+    /// get a -5% lift — but Overpass and FS Millbank already carry extra
+    /// ascent in their vertical metrics and need almost none to sit level.
+    var townOffsetFactor: CGFloat {
+        switch self {
+        case .overpass, .fsMillbank: return -0.01
+        default:                     return -0.05
+        }
+    }
+
     /// PostScript name of the face for a weight; nil = use the system font.
     func face(for weight: Font.Weight) -> String? {
         switch self {

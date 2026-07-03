@@ -95,8 +95,9 @@ struct WayfindingView<Trailing: View>: View {
             // Optical centering: the font's line box reserves headroom above cap
             // height (diacritics) that a title-case name never fills, so metric
             // centering leaves extra air on top. Nudge the visible mass up a bit;
-            // pure visual shift, so descenders keep their room below.
-            .offset(y: -townSize * 0.05)
+            // pure visual shift, so descenders keep their room below. The amount
+            // is per-family — vertical metrics differ (AppFont.townOffsetFactor).
+            .offset(y: townSize * state.appFont.townOffsetFactor)
     }
 
     // MARK: Line 3 — altitude + heading
