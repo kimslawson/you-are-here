@@ -45,6 +45,7 @@ struct RouteShield: View {
                 .font(Theme.font(size: height * 0.5, weight: .bold, family: family))
                 .foregroundColor(color)
                 .padding(.top, height * 0.06)
+                .offset(y: height * family.markerTextOffsetFactor)
                 .minimumScaleFactor(0.5)
         }
         .frame(width: height * 0.94, height: height)
@@ -55,6 +56,7 @@ struct RouteShield: View {
         Text(inner)
             .font(Theme.font(size: height * 0.46, weight: .bold, family: family))
             .foregroundColor(color)
+            .offset(y: height * family.markerTextOffsetFactor)
             .minimumScaleFactor(0.5)
             .padding(.horizontal, height * 0.22)
             .frame(height: height)

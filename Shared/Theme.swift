@@ -62,13 +62,22 @@ enum AppFont: String, CaseIterable, Identifiable, Codable {
     /// Optical vertical correction for the big town line, as a fraction of the
     /// town point size (negative = up). Metric centering leaves title-case
     /// names looking high-set (see WayfindingView.townLine), so most families
-    /// get a -5% lift — but Overpass and FS Millbank already carry extra
-    /// ascent in their vertical metrics and need almost none to sit level.
+    /// get a -5% lift — but Overpass and FS Millbank carry extra ascent in
+    /// their vertical metrics and need little to none (Millbank even rides a
+    /// touch low, i.e. positive).
     var townOffsetFactor: CGFloat {
         switch self {
-        case .overpass, .fsMillbank: return -0.01
-        default:                     return -0.05
+        case .fsMillbank: return 0.01
+        case .overpass:   return -0.01
+        default:          return -0.05
         }
+    }
+
+    /// Vertical correction for the text inside route markers (shield/box), as
+    /// a fraction of the marker height (positive = down). FS Millbank's tall
+    /// ascent floats its text visibly high in the marker.
+    var markerTextOffsetFactor: CGFloat {
+        self == .fsMillbank ? 0.07 : 0
     }
 
     /// PostScript name of the face for a weight; nil = use the system font.

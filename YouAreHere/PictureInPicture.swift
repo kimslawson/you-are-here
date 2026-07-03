@@ -219,8 +219,11 @@ struct PiPFrameView: View {
     var body: some View {
         ZStack {
             Theme.background
-            WayfindingView(state: state, townSize: large ? 84 : 56,
-                           alignment: .leading, speedSignScale: 2)
+            // Small trades a bit of town size for bigger secondary lines —
+            // at strip size the small type is what goes illegible first.
+            WayfindingView(state: state, townSize: large ? 84 : 50,
+                           alignment: .leading, speedSignScale: 2,
+                           smallScale: large ? 1 : 1.25)
                 .padding(.horizontal, large ? 30 : 22)
                 .padding(.vertical, large ? 18 : 14)
         }

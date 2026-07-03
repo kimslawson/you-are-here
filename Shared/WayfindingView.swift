@@ -15,12 +15,16 @@ struct WayfindingView<Trailing: View>: View {
     /// Live Activity) pass 2: the sign renders bigger but keeps its normal
     /// layout footprint, overflowing downward over the town line.
     var speedSignScale: CGFloat = 1
+    /// Extra scale for the small lines (road/route + altitude/heading) relative
+    /// to their townSize-derived default. The PiP strip bumps this above 1 so
+    /// secondary type stays legible at video-frame sizes.
+    var smallScale: CGFloat = 1
     /// Optional control pinned to the trailing end of the altitude/heading line
     /// (e.g. the park/resume button).
     @ViewBuilder var trailing: () -> Trailing
 
-    private var smallSize: CGFloat { max(12, townSize * 0.27) }
-    private var shieldHeight: CGFloat { max(16, townSize * 0.34) }
+    private var smallSize: CGFloat { max(12, townSize * 0.27 * smallScale) }
+    private var shieldHeight: CGFloat { max(16, townSize * 0.34 * smallScale) }
 
     private var showSeparateRoad: Bool {
         guard let route = state.route else { return false }
@@ -81,6 +85,9 @@ struct WayfindingView<Trailing: View>: View {
         }
         .lineLimit(1)
         .minimumScaleFactor(0.6)
+        // Optical alignment: the small type's left sidebearing sits a touch
+        // further out than the big town line's — tuck the road line in a bit.
+        .padding(.leading, smallSize * 0.1)
     }
 
     // MARK: Line 2 — town (the headline)
