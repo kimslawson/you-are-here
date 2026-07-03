@@ -22,10 +22,8 @@ final class PiPManager: NSObject, ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var enabled = false
 
-    /// Banner canvas in points (≈3:1 — wide and short, unlike a video player).
-    /// Rendered at `renderScale`× so text stays crisp when the window is pinched
-    /// large.
-    static let canvasSize = CGSize(width: 480, height: 160)
+    /// Frames render at `renderScale`× so text stays crisp when the window is
+    /// pinched large. The canvas geometry lives on `PiPFrameView`.
     private let renderScale: CGFloat = 3
 
     func bind(to engine: LocationEngine) {
@@ -103,10 +101,17 @@ final class PiPManager: NSObject, ObservableObject {
 
     // MARK: Frame pipeline
 
+    /// Re-render the current readout, e.g. after the window-size setting flips
+    /// (the PiP window animates to the new aspect ratio on the next frame).
+    func redraw() {
+        if let state = engine?.state { renderFrame(state) }
+    }
+
     private func renderFrame(_ state: LocationActivityAttributes.ContentState) {
         guard enabled, controller != nil else { return }
 
-        let renderer = ImageRenderer(content: PiPFrameView(state: state))
+        let large = UserDefaults.standard.bool(forKey: SettingsKey.pipLargeWindow)
+        let renderer = ImageRenderer(content: PiPFrameView(state: state, large: large))
         renderer.scale = renderScale
         guard let image = renderer.cgImage,
               let pixelBuffer = Self.pixelBuffer(from: image),
@@ -202,19 +207,24 @@ private final class PiPPlaybackDelegate: NSObject, AVPictureInPictureSampleBuffe
     }
 }
 
-/// What each PiP video frame shows: the shared wayfinding layout on a wide,
-/// short banner. Scaled-up speed sign, same as the other cramped layouts.
+/// What each PiP video frame shows: the shared wayfinding layout on a wide
+/// banner. Scaled-up speed sign, same as the other cramped layouts. Two
+/// canvases (the frame's shape IS the window's aspect ratio): small is a
+/// ≈3:1 strip; large is 2:1 with proportionally bigger type — more screen,
+/// more legible.
 struct PiPFrameView: View {
     let state: LocationActivityAttributes.ContentState
+    var large = false
 
     var body: some View {
         ZStack {
             Theme.background
-            WayfindingView(state: state, townSize: 56, alignment: .leading, speedSignScale: 2)
-                .padding(.horizontal, 22)
-                .padding(.vertical, 14)
+            WayfindingView(state: state, townSize: large ? 84 : 56,
+                           alignment: .leading, speedSignScale: 2)
+                .padding(.horizontal, large ? 30 : 22)
+                .padding(.vertical, large ? 18 : 14)
         }
-        .frame(width: PiPManager.canvasSize.width, height: PiPManager.canvasSize.height)
+        .frame(width: 480, height: large ? 240 : 160)
     }
 }
 

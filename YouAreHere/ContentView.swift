@@ -8,6 +8,7 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(SettingsKey.unitIsMetric) private var unitIsMetric = false
     @AppStorage(SettingsKey.pictureInPicture) private var pictureInPicture = false
+    @AppStorage(SettingsKey.pipLargeWindow) private var pipLargeWindow = false
     @StateObject private var pip = PiPManager()
     @State private var showSettings = false
     /// Landscape-only: the gear is hidden until a tap reveals it (it shares the
@@ -90,6 +91,10 @@ struct ContentView: View {
         }
         .onChange(of: pictureInPicture) { enabled in
             pip.setEnabled(enabled)
+        }
+        .onChange(of: pipLargeWindow) { _ in
+            // Next frame carries the new canvas; the window animates to match.
+            pip.redraw()
         }
         .onChange(of: scenePhase) { phase in
             // Back in the foreground (app icon, Live Activity tap, PiP restore
@@ -184,6 +189,7 @@ struct SettingsView: View {
     @AppStorage(SettingsKey.onlineRouteLookup) private var onlineRouteLookup = false
     @AppStorage(SettingsKey.showSpeedLimit) private var showSpeedLimit = false
     @AppStorage(SettingsKey.pictureInPicture) private var pictureInPicture = false
+    @AppStorage(SettingsKey.pipLargeWindow) private var pipLargeWindow = false
     @AppStorage(SettingsKey.appFont) private var appFont = AppFont.helvetica.rawValue
     @AppStorage(SettingsKey.lightMode) private var lightMode = false
     @AppStorage(SettingsKey.customFlashColor) private var customFlashColor = false
@@ -263,7 +269,12 @@ struct SettingsView: View {
                 }
                 Section("Floating window") {
                     Toggle("Float over other apps", isOn: $pictureInPicture)
-                    Text("When you leave the app, keep the readout in a small floating window over other apps (Picture in Picture). Its play/pause button parks and resumes. Off by default.")
+                    Picker("Window size", selection: $pipLargeWindow) {
+                        Text("Small").tag(false)
+                        Text("Large").tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                    Text("When you leave the app, keep the readout in a floating window over other apps (Picture in Picture). Its play/pause button parks and resumes. Small is a slim strip; Large is taller with bigger, more legible type. Off by default.")
                         .font(.footnote)
                         .foregroundColor(.secondary)
                 }

@@ -9,6 +9,7 @@ enum SettingsKey {
     static let onlineRouteLookup = "onlineRouteLookup"
     static let showSpeedLimit = "showSpeedLimit"
     static let pictureInPicture = "pictureInPicture"
+    static let pipLargeWindow = "pipLargeWindow"
     static let appFont = "appFont"
     static let lightMode = "lightMode"
     static let customFlashColor = "customFlashColor"

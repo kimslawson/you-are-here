@@ -92,7 +92,9 @@ When the **town, road, or compass direction changes**, that field briefly
   state but tapping opens the app instead.
 - **Floating window (opt-in).** *Settings ▸ Floating window ▸ Float over other
   apps.* When you leave the app, the readout stays in a small Picture-in-Picture
-  banner floating over other apps. iOS only lets *video* float, so
+  banner floating over other apps. A Small/Large toggle picks the banner
+  shape: Small is a slim ≈3:1 strip, Large is 2:1 with proportionally bigger
+  type for legibility. iOS only lets *video* float, so
   `PictureInPicture.swift` renders `WayfindingView` into video frames (one per
   engine update, via `ImageRenderer` → `AVSampleBufferDisplayLayer` →
   `AVPictureInPictureController`); the wide ~3:1 frame shape gives the window
