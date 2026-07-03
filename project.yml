@@ -20,7 +20,7 @@ settings:
     # Your 10-character Apple Developer Team ID (Xcode > Settings > Accounts).
     # Set here so it survives regeneration and applies to BOTH targets — a team
     # picked in Xcode's Signing pane is wiped on the next `xcodegen generate`.
-    DEVELOPMENT_TEAM: ""
+    DEVELOPMENT_TEAM: "85UNYZPB4U"
     # Xcode's "recommended settings" (the checked items in its upgrade dialog).
     ENABLE_USER_SCRIPT_SANDBOXING: YES
     STRING_CATALOG_GENERATE_SYMBOLS: YES
