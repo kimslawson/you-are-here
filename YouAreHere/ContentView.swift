@@ -6,11 +6,21 @@ import CoreLocation
 struct ContentView: View {
     @EnvironmentObject private var engine: LocationEngine
     @AppStorage(SettingsKey.unitIsMetric) private var unitIsMetric = false
+    @AppStorage(SettingsKey.pictureInPicture) private var pictureInPicture = false
+    @StateObject private var pip = PiPManager()
     @State private var showSettings = false
 
     var body: some View {
         ZStack {
             Theme.background.ignoresSafeArea()
+
+            // Offscreen-ish host for the PiP video layer (must be in the
+            // hierarchy for AVKit to float it).
+            PiPHostView(manager: pip)
+                .frame(width: 1, height: 1)
+                .opacity(0.01)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
 
             if needsPermission {
                 permissionPrompt
@@ -55,9 +65,14 @@ struct ContentView: View {
             UIApplication.shared.isIdleTimerDisabled = !engine.isPaused
             engine.requestAuthorization()
             engine.start()
+            pip.bind(to: engine)
+            pip.setEnabled(pictureInPicture)
         }
         .onChange(of: engine.isPaused) { paused in
             UIApplication.shared.isIdleTimerDisabled = !paused
+        }
+        .onChange(of: pictureInPicture) { enabled in
+            pip.setEnabled(enabled)
         }
         .onDisappear {
             UIApplication.shared.isIdleTimerDisabled = false
@@ -112,6 +127,7 @@ struct SettingsView: View {
     @AppStorage(SettingsKey.refreshSeconds) private var refreshSeconds = 1
     @AppStorage(SettingsKey.onlineRouteLookup) private var onlineRouteLookup = false
     @AppStorage(SettingsKey.showSpeedLimit) private var showSpeedLimit = false
+    @AppStorage(SettingsKey.pictureInPicture) private var pictureInPicture = false
 
     var body: some View {
         NavigationStack {
@@ -144,6 +160,12 @@ struct SettingsView: View {
                 Section("Speed limit") {
                     Toggle("Show speed limit", isOn: $showSpeedLimit)
                     Text("Show the posted speed limit from OpenStreetMap when available. Like route lookup, this sends your location to a third-party server (overpass-api.de) and needs a network connection — coverage is partial, especially on minor roads. Off by default.")
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                }
+                Section("Floating window") {
+                    Toggle("Float over other apps", isOn: $pictureInPicture)
+                    Text("When you leave the app, keep the readout in a small floating window over other apps (Picture in Picture). Its play/pause button parks and resumes. Off by default.")
                         .font(.footnote)
                         .foregroundColor(.secondary)
                 }

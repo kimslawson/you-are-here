@@ -23,10 +23,13 @@
 	<key>NSMotionUsageDescription</key>
 	<string>Uses the barometer for smooth, accurate altitude.</string>
 
-	<!-- Run location updates in the background to keep the Live Activity fresh -->
+	<!-- location: keep updates flowing in the background for the Live Activity.
+	     audio: "Audio, AirPlay, and Picture in Picture" — required for the
+	     opt-in floating-window (PiP) feature. -->
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>
+		<string>audio</string>
 	</array>
 
 	<key>UIApplicationSceneManifest</key>

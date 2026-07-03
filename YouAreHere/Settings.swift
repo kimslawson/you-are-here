@@ -8,6 +8,7 @@ enum SettingsKey {
     static let refreshSeconds = "refreshSeconds"
     static let onlineRouteLookup = "onlineRouteLookup"
     static let showSpeedLimit = "showSpeedLimit"
+    static let pictureInPicture = "pictureInPicture"
 }
 
 extension UserDefaults {

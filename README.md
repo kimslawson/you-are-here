@@ -49,6 +49,17 @@ When the **town, road, or compass direction changes**, that field briefly
   The Live Activity button is interactive on iOS 17+ (via an App Intent that
   runs in the app process and relaunches it if needed); on iOS 16 it shows the
   state but tapping opens the app instead.
+- **Floating window (opt-in).** *Settings ▸ Floating window ▸ Float over other
+  apps.* When you leave the app, the readout stays in a small Picture-in-Picture
+  banner floating over other apps. iOS only lets *video* float, so
+  `PictureInPicture.swift` renders `WayfindingView` into video frames (one per
+  engine update, via `ImageRenderer` → `AVSampleBufferDisplayLayer` →
+  `AVPictureInPictureController`); the wide ~3:1 frame shape gives the window
+  its banner aspect. The PiP play/pause control maps to park/resume; other
+  interaction opens the app. **Off by default.** Requires the audio/PiP
+  background mode. Note for distribution: Apple's review guidelines describe
+  PiP as a video-playback feature, and non-video uses like this have
+  historically been a rejection risk.
 
 ## How it updates
 
