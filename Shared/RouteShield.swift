@@ -37,18 +37,23 @@ struct RouteShield: View {
         }
     }
 
-    // Interstate: shield silhouette outline + number.
+    // Interstate: shield silhouette outline + number. Like the real M1-1 sign,
+    // the three-digit blank is wider so the number clears the curved sides.
     private var interstate: some View {
-        ZStack {
+        let wide = inner.count >= 3
+        return ZStack {
             ShieldShape().stroke(color, lineWidth: lineWidth)
             Text(inner)
-                .font(Theme.font(size: height * 0.5, weight: .bold, family: family))
+                .font(Theme.font(size: height * (wide ? 0.44 : 0.5), weight: .bold, family: family))
                 .foregroundColor(color)
                 .padding(.top, height * 0.06)
+                // Inset from the outline so the scale-to-fit targets the
+                // shield's interior, not its full frame.
+                .padding(.horizontal, height * 0.10)
                 .offset(y: height * family.markerTextOffsetFactor)
                 .minimumScaleFactor(0.5)
         }
-        .frame(width: height * 0.94, height: height)
+        .frame(width: height * (wide ? 1.22 : 0.94), height: height)
     }
 
     // US / state: rounded-rect outline hugging the region text.
@@ -96,6 +101,7 @@ private struct ShieldShape: Shape {
 #Preview {
     HStack(spacing: 12) {
         RouteShield(route: RouteRef(kind: .interstate, number: "80", stateAbbrev: nil), height: 36, color: Theme.secondary)
+        RouteShield(route: RouteRef(kind: .interstate, number: "580", stateAbbrev: nil), height: 36, color: Theme.secondary)
         RouteShield(route: RouteRef(kind: .usHighway, number: "50", stateAbbrev: nil), height: 36, color: Theme.secondary)
         RouteShield(route: RouteRef(kind: .stateHighway, number: "73", stateAbbrev: "ME"), height: 36, color: Theme.secondary)
     }
