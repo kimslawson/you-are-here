@@ -5,14 +5,25 @@ options:
     iOS: "16.2"
   createIntermediateGroups: true
 
+# Tell Xcode this project has already been through its "update to recommended
+# settings" pass, so it stops flagging the generated project. Bump when a new
+# Xcode nags again (format: Xcode 26.3 -> 2630).
+attributes:
+  LastUpgradeCheck: "2630"
+
 settings:
   base:
     MARKETING_VERSION: "1.0"
     CURRENT_PROJECT_VERSION: "1"
     SWIFT_VERSION: "5.9"
     CODE_SIGN_STYLE: Automatic
-    # Set your Apple Developer team id here (or in Xcode > Signing & Capabilities).
+    # Your 10-character Apple Developer Team ID (Xcode > Settings > Accounts).
+    # Set here so it survives regeneration and applies to BOTH targets — a team
+    # picked in Xcode's Signing pane is wiped on the next `xcodegen generate`.
     DEVELOPMENT_TEAM: ""
+    # Xcode's "recommended settings" (the checked items in its upgrade dialog).
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    STRING_CATALOG_GENERATE_SYMBOLS: YES
     # Let Xcode inject the standard CFBundle* keys (CFBundleIdentifier, etc.) and
     # MERGE them into our custom Info.plist files (which add the Live Activity,
     # location, and background-mode keys). Without this the built .app has no
