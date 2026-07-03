@@ -209,15 +209,22 @@ python3 design/appicon.py   # rewrites YouAreHere/Assets.xcassets/AppIcon.appico
   - **Online lookup (opt-in).** *Settings ▸ Route numbers ▸ Look up online.* When
     Apple gives a plain street name, the app queries OpenStreetMap (Overpass) for
     the nearest road's route `ref` and shows the shield (see
-    `RouteRefResolver.swift`). It's **off by default** because it sends your
-    coordinate to a third-party server (`overpass-api.de`) and needs a network
-    connection — so it won't help in the no-signal areas this app is otherwise
-    built for. To stay within Overpass's fair-use limits, it fires **only when
-    the road changes** (not every tick), one request at a time, with a minimum
-    spacing between calls; failures fall back silently to Apple-only behavior.
+    `RouteRefResolver.swift`, `RoadInfoResolver`). It's **off by default** because
+    it sends your coordinate to a third-party server (`overpass-api.de`) and needs
+    a network connection — so it won't help in the no-signal areas this app is
+    otherwise built for. To stay within Overpass's fair-use limits, it fires
+    **only when the road changes** (not every tick), one request at a time, with a
+    minimum spacing between calls; failures fall back silently to Apple-only.
   - **Offline dataset (future).** Bundled OSM data would supply route `ref`s with
-    no network and work off-grid. `RouteRefResolver` is a protocol so an offline
+    no network and work off-grid. `RoadInfoResolver` is a protocol so an offline
     resolver can drop in behind the same seam.
+- **Speed limit (opt-in).** *Settings ▸ Speed limit ▸ Show speed limit.* Reads the
+  posted limit from OpenStreetMap's `maxspeed` tag and shows a gray "SPEED LIMIT"
+  sign at the trailing end of the road row (flashes white on change). There is no
+  Apple API for speed limits, so this uses the **same** Overpass road-change
+  lookup as route numbers — negligible extra battery. Same caveats: needs network
+  and OSM coverage is partial, especially on minor/rural roads (shows nothing when
+  unknown). Units follow the Imperial/Metric setting.
 - **Route shields are heuristic.** `RouteParser` pattern-matches the route text
   ("I-80", "US Highway 50", "CA-89", "ME 131"); some forms won't match and show
   as a plain name. Shields are stylized, not pixel-accurate MUTCD artwork.

@@ -109,6 +109,7 @@ struct SettingsView: View {
     @AppStorage(SettingsKey.unitIsMetric) private var unitIsMetric = false
     @AppStorage(SettingsKey.refreshSeconds) private var refreshSeconds = 1
     @AppStorage(SettingsKey.onlineRouteLookup) private var onlineRouteLookup = false
+    @AppStorage(SettingsKey.showSpeedLimit) private var showSpeedLimit = false
 
     var body: some View {
         NavigationStack {
@@ -135,6 +136,12 @@ struct SettingsView: View {
                 Section("Route numbers") {
                     Toggle("Look up online", isOn: $onlineRouteLookup)
                     Text("When Apple labels a road only by its street name, look up its route number (e.g. ME-131) from OpenStreetMap. This sends your location to a third-party server (overpass-api.de) and needs a network connection. Off by default.")
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                }
+                Section("Speed limit") {
+                    Toggle("Show speed limit", isOn: $showSpeedLimit)
+                    Text("Show the posted speed limit from OpenStreetMap when available. Like route lookup, this sends your location to a third-party server (overpass-api.de) and needs a network connection — coverage is partial, especially on minor roads. Off by default.")
                         .font(.footnote)
                         .foregroundColor(.secondary)
                 }

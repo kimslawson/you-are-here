@@ -55,4 +55,14 @@ enum Formatting {
             return route.number
         }
     }
+
+    /// Posted speed limit as a whole number in the display unit, e.g. 45 (mph)
+    /// or 72 (km/h). Returns nil when unknown.
+    static func speedLimitValue(kmh: Double?, metric: Bool) -> Int? {
+        guard let kmh else { return nil }
+        return Int((metric ? kmh : kmh * 0.621371).rounded())
+    }
+
+    /// The unit abbreviation for the current setting.
+    static func speedUnit(metric: Bool) -> String { metric ? "km/h" : "mph" }
 }

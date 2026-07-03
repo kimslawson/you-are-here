@@ -19,8 +19,8 @@ final class LocationEngine: NSObject, ObservableObject {
     @Published private(set) var state = LocationActivityAttributes.ContentState(
         town: "", road: "", route: nil, altitudeMeters: nil, headingDegrees: nil,
         headingContinuous: nil,
-        unitIsMetric: false, hasSignal: true, isPaused: false,
-        townChanged: false, roadChanged: false, headingChanged: false)
+        unitIsMetric: false, hasSignal: true, isPaused: false, speedLimitKmh: nil,
+        townChanged: false, roadChanged: false, headingChanged: false, speedLimitChanged: false)
     @Published private(set) var authorization: CLAuthorizationStatus = .notDetermined
     @Published private(set) var isRunning = false
     /// "Parked": sensors frozen to save battery. Persisted across launches.
@@ -46,16 +46,18 @@ final class LocationEngine: NSObject, ObservableObject {
     private let geocodeMinInterval: TimeInterval = 12
     private var lastGeocodeAttempt = Date.distantPast
 
-    // MARK: Online route lookup (opt-in; fills route numbers Apple omits)
-    private let routeResolver: RouteRefResolver = OverpassRouteResolver()
-    private var routeLookupInFlight = false
-    private var lastRouteLookup = Date.distantPast
-    /// The road we last resolved a route for, and the result (nil = looked up,
-    /// found nothing — so we don't keep retrying the same road).
-    private var routeLookupRoad: String?
-    private var routeLookupResult: RouteRef?
+    // MARK: Online road info (opt-in; fills route numbers + speed limit Apple omits)
+    private let roadInfoResolver: RoadInfoResolver = OverpassRoadInfoResolver()
+    private var roadInfoInFlight = false
+    private var lastRoadInfoLookup = Date.distantPast
+    /// The road we last resolved info for, and the result (a resolved road with
+    /// nil fields means "looked up, found nothing" — so we don't keep retrying).
+    private var roadInfoRoad: String?
+    private var roadInfoResult = RoadInfo()
     /// Minimum spacing between Overpass calls, on top of the once-per-road gate.
-    private let routeLookupMinInterval: TimeInterval = 5
+    private let roadInfoMinInterval: TimeInterval = 5
+    /// Last committed speed limit (km/h), for the change-flash.
+    private var lastSpeedKmh: Double?
 
     // MARK: Tick throttle
     private var tickTimer: Timer?
@@ -282,12 +284,15 @@ final class LocationEngine: NSObject, ObservableObject {
         let metric = UserDefaults.standard.unitIsMetric
         let town = lastPlace?.town ?? ""
         let road = lastPlace?.road ?? ""
-        // Prefer Apple's route; otherwise use the online lookup result if enabled
-        // and it was resolved for this same road.
+        // Online road info (route + speed) applies only while it matches this road.
+        let haveInfo = road == roadInfoRoad
+        // Prefer Apple's route; otherwise use the online lookup result if enabled.
         let onlineRoute = UserDefaults.standard.bool(forKey: SettingsKey.onlineRouteLookup)
-            && road == routeLookupRoad ? routeLookupResult : nil
+            && haveInfo ? roadInfoResult.route : nil
         let route = lastPlace?.route ?? onlineRoute
         let routeLabel = route.map(Formatting.routeLabel)
+        let speedKmh = UserDefaults.standard.bool(forKey: SettingsKey.showSpeedLimit)
+            && haveInfo ? roadInfoResult.speedLimitKmh : nil
         let altitude = fuser.altitudeMeters ?? (loc.verticalAccuracy > 0 ? loc.altitude : nil)
         let heading = latestHeading
         let cardinal = heading.map(Formatting.cardinal)
@@ -308,13 +313,16 @@ final class LocationEngine: NSObject, ObservableObject {
         let townChanged = lastTown != nil && town != lastTown && !town.isEmpty
         let roadChanged = lastRoad != nil && (road != lastRoad || routeLabel != lastRouteLabel)
         let headingChanged = lastCardinal != nil && cardinal != nil && cardinal != lastCardinal
+        let speedChanged = lastSpeedKmh != nil && speedKmh != nil && speedKmh != lastSpeedKmh
 
         let newState = LocationActivityAttributes.ContentState(
             town: town, road: road, route: route,
             altitudeMeters: altitude, headingDegrees: heading,
             headingContinuous: continuousHeading,
             unitIsMetric: metric, hasSignal: networkAvailable, isPaused: false,
-            townChanged: townChanged, roadChanged: roadChanged, headingChanged: headingChanged)
+            speedLimitKmh: speedKmh,
+            townChanged: townChanged, roadChanged: roadChanged, headingChanged: headingChanged,
+            speedLimitChanged: speedChanged)
 
         state = newState
 
@@ -323,8 +331,9 @@ final class LocationEngine: NSObject, ObservableObject {
         lastRoad = road
         lastRouteLabel = routeLabel
         if let cardinal { lastCardinal = cardinal }
+        if let speedKmh { lastSpeedKmh = speedKmh }
 
-        pushActivityIfNeeded(newState, important: townChanged || roadChanged || headingChanged)
+        pushActivityIfNeeded(newState, important: townChanged || roadChanged || headingChanged || speedChanged)
     }
 
     /// Push the current (frozen) readout with the latest `isPaused`, clearing
@@ -336,6 +345,7 @@ final class LocationEngine: NSObject, ObservableObject {
         s.townChanged = false
         s.roadChanged = false
         s.headingChanged = false
+        s.speedLimitChanged = false
         state = s
 
         guard let activity else { return }
@@ -370,7 +380,7 @@ final class LocationEngine: NSObject, ObservableObject {
                 await MainActor.run {
                     self.lastPlace = place
                     self.lastGeocodedLocation = target
-                    self.maybeLookupRoute(target: target, place: place)
+                    self.maybeLookupRoadInfo(target: target, place: place)
                 }
             } catch {
                 // Network blip or no result: keep the last known place (stale).
@@ -379,33 +389,34 @@ final class LocationEngine: NSObject, ObservableObject {
         }
     }
 
-    /// Fill in a route number from OpenStreetMap when the user has opted in and
-    /// Apple gave only a plain street name. Fires at most once per *road change*
-    /// (and never faster than `routeLookupMinInterval`) to respect Overpass's
+    /// Fetch road info (route number + speed limit) from OpenStreetMap when the
+    /// user has opted into either feature. Fires at most once per *road change*
+    /// (and never faster than `roadInfoMinInterval`) to respect Overpass's
     /// fair-use limits.
-    private func maybeLookupRoute(target: CLLocation, place: ResolvedPlace) {
-        guard UserDefaults.standard.bool(forKey: SettingsKey.onlineRouteLookup) else { return }
+    private func maybeLookupRoadInfo(target: CLLocation, place: ResolvedPlace) {
+        let wantRoute = UserDefaults.standard.bool(forKey: SettingsKey.onlineRouteLookup) && place.route == nil
+        let wantSpeed = UserDefaults.standard.bool(forKey: SettingsKey.showSpeedLimit)
+        guard wantRoute || wantSpeed else { return }
         guard networkAvailable else { return }
-        guard place.route == nil else { return }            // Apple already had it
         let road = place.road
         guard !road.isEmpty else { return }
-        guard road != routeLookupRoad else { return }       // already handled this road
+        guard road != roadInfoRoad else { return }          // already handled this road
         // Watchdog + minimum spacing between calls.
-        if routeLookupInFlight && Date().timeIntervalSince(lastRouteLookup) < 30 { return }
-        guard Date().timeIntervalSince(lastRouteLookup) >= routeLookupMinInterval else { return }
+        if roadInfoInFlight && Date().timeIntervalSince(lastRoadInfoLookup) < 30 { return }
+        guard Date().timeIntervalSince(lastRoadInfoLookup) >= roadInfoMinInterval else { return }
 
-        routeLookupInFlight = true
-        lastRouteLookup = Date()
+        roadInfoInFlight = true
+        lastRoadInfoLookup = Date()
 
         Task { [weak self] in
             guard let self else { return }
-            defer { Task { @MainActor in self.routeLookupInFlight = false } }
-            let ref = try? await self.routeResolver.routeRef(near: target)
+            defer { Task { @MainActor in self.roadInfoInFlight = false } }
+            let info = (try? await self.roadInfoResolver.roadInfo(near: target)) ?? RoadInfo()
             await MainActor.run {
                 // Record the result against the road so we don't re-query it,
-                // whether or not we found a number.
-                self.routeLookupRoad = road
-                self.routeLookupResult = ref
+                // whether or not we found anything.
+                self.roadInfoRoad = road
+                self.roadInfoResult = info
             }
         }
     }

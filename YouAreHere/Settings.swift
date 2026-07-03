@@ -8,6 +8,7 @@ enum SettingsKey {
     static let isPaused = "isPaused"
     static let refreshSeconds = "refreshSeconds"
     static let onlineRouteLookup = "onlineRouteLookup"
+    static let showSpeedLimit = "showSpeedLimit"
 }
 
 extension UserDefaults {

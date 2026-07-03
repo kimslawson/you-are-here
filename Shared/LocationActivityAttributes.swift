@@ -44,6 +44,9 @@ struct LocationActivityAttributes: ActivityAttributes {
         var hasSignal: Bool
         /// True when "parked" — sensors are frozen to save battery.
         var isPaused: Bool
+        /// Posted speed limit in km/h (canonical; formatted per unit at render).
+        /// nil when unknown / disabled.
+        var speedLimitKmh: Double?
 
         // MARK: Flash flags
         // Set `true` on the single update where the field just changed, so the
@@ -51,6 +54,7 @@ struct LocationActivityAttributes: ActivityAttributes {
         var townChanged: Bool
         var roadChanged: Bool
         var headingChanged: Bool
+        var speedLimitChanged: Bool
 
         static var placeholder: ContentState {
             ContentState(
@@ -63,9 +67,11 @@ struct LocationActivityAttributes: ActivityAttributes {
                 unitIsMetric: false,
                 hasSignal: true,
                 isPaused: false,
+                speedLimitKmh: 72,
                 townChanged: false,
                 roadChanged: false,
-                headingChanged: false
+                headingChanged: false,
+                speedLimitChanged: false
             )
         }
     }

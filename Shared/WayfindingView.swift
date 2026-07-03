@@ -63,7 +63,11 @@ struct WayfindingView<Trailing: View>: View {
                     .font(Theme.font(size: smallSize, weight: .medium))
                     .foregroundColor(Theme.textColor(changed: state.roadChanged, base: Theme.secondary))
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: smallSize * 0.5)
+            if let limit = Formatting.speedLimitValue(kmh: state.speedLimitKmh, metric: state.unitIsMetric) {
+                SpeedLimitSign(value: limit, height: townSize * 0.5,
+                               color: Theme.textColor(changed: state.speedLimitChanged, base: Theme.secondary))
+            }
         }
         .lineLimit(1)
         .minimumScaleFactor(0.6)
@@ -117,6 +121,35 @@ struct WayfindingView<Trailing: View>: View {
         }
         .lineLimit(1)
         .minimumScaleFactor(0.6)
+    }
+}
+
+/// A US-style posted speed-limit sign ("SPEED / LIMIT / nn"), drawn monochrome
+/// in `color` so it matches the road text and flashes white on change. The unit
+/// (mph vs km/h) follows the app setting; the value is already converted.
+struct SpeedLimitSign: View {
+    let value: Int
+    var height: CGFloat
+    var color: Color = Theme.secondary
+
+    var body: some View {
+        VStack(spacing: height * 0.015) {
+            Text("SPEED").font(Theme.font(size: height * 0.15, weight: .semibold))
+            Text("LIMIT").font(Theme.font(size: height * 0.15, weight: .semibold))
+            Text("\(value)")
+                .font(Theme.font(size: height * 0.42, weight: .bold))
+                .padding(.top, height * 0.02)
+        }
+        .foregroundColor(color)
+        .lineLimit(1)
+        .minimumScaleFactor(0.5)
+        .padding(.horizontal, height * 0.14)
+        .padding(.vertical, height * 0.09)
+        .background(
+            RoundedRectangle(cornerRadius: height * 0.10)
+                .stroke(color, lineWidth: max(1, height * 0.045))
+        )
+        .fixedSize()
     }
 }
 

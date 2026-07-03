@@ -34,14 +34,21 @@ struct YouAreHereLiveActivity: Widget {
                     }
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text(Formatting.altitudeString(meters: context.state.altitudeMeters,
-                                                       metric: context.state.unitIsMetric))
-                            .font(Theme.font(size: 13, weight: .medium))
-                            .foregroundColor(Theme.secondary)
-                        Text(Formatting.headingString(context.state.headingDegrees))
-                            .font(Theme.font(size: 13, weight: .medium))
-                            .foregroundColor(Theme.textColor(changed: context.state.headingChanged, base: Theme.secondary))
+                    HStack(spacing: 8) {
+                        if let limit = Formatting.speedLimitValue(kmh: context.state.speedLimitKmh,
+                                                                  metric: context.state.unitIsMetric) {
+                            SpeedLimitSign(value: limit, height: 34,
+                                           color: Theme.textColor(changed: context.state.speedLimitChanged, base: Theme.secondary))
+                        }
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text(Formatting.altitudeString(meters: context.state.altitudeMeters,
+                                                           metric: context.state.unitIsMetric))
+                                .font(Theme.font(size: 13, weight: .medium))
+                                .foregroundColor(Theme.secondary)
+                            Text(Formatting.headingString(context.state.headingDegrees))
+                                .font(Theme.font(size: 13, weight: .medium))
+                                .foregroundColor(Theme.textColor(changed: context.state.headingChanged, base: Theme.secondary))
+                        }
                     }
                 }
                 DynamicIslandExpandedRegion(.center) {
