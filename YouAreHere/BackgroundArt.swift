@@ -11,6 +11,8 @@ enum BackgroundArt: String, CaseIterable, Identifiable {
     case streets
     /// Slowly drifting topographic contour lines, generated on-device.
     case topo
+    /// Dim synthwave grid whose scroll speed follows GPS speed. Dark mode only.
+    case neon
 
     var id: String { rawValue }
 }
@@ -24,7 +26,107 @@ struct BackgroundArtView: View {
         case .off:     EmptyView()
         case .streets: StreetsBackground()
         case .topo:    TopoBackground()
+        case .neon:    NeonBackground()
         }
+    }
+}
+
+// MARK: - Neon (synthwave grid; scroll speed follows GPS speed)
+
+/// The outrun look, dimmed to wallpaper: a perspective grid rolling toward the
+/// viewer with a striped sun on the horizon. The grid's scroll rate follows
+/// the GPS ground speed (low-passed so it breathes rather than jumps), with a
+/// slow idle crawl at rest. Loops seamlessly — the scene is phase-periodic per
+/// grid row, so there's no "seam" at all, just the next row. Dark mode only
+/// (ContentView gates it); the palette is fixed neon, not Theme-derived.
+struct NeonBackground: View {
+    @EnvironmentObject private var engine: LocationEngine
+    @State private var phase = 0.0           // grid scroll, wraps every row
+    @State private var smoothedSpeed = 0.0   // m/s, low-passed
+    @State private var lastTick: Date?
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1.0 / 24)) { timeline in
+            Canvas { ctx, size in
+                Self.draw(ctx: &ctx, size: size, phase: phase)
+            }
+            .onChange(of: timeline.date) { now in
+                let dt = lastTick.map { min(now.timeIntervalSince($0), 0.5) } ?? 0
+                lastTick = now
+                // Ease toward the current GPS speed over ~half a second.
+                smoothedSpeed += (engine.speedMPS - smoothedSpeed) * min(1, dt * 2)
+                // Idle crawl + speed: ~65 mph ≈ 2.4 grid rows/second.
+                let rowsPerSecond = 0.12 + smoothedSpeed * 0.08
+                phase = (phase + rowsPerSecond * dt).truncatingRemainder(dividingBy: 1)
+            }
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+    }
+
+    private static func draw(ctx: inout GraphicsContext, size: CGSize, phase: Double) {
+        let w = size.width, h = size.height
+        let horizonY = h * 0.42
+        let gridHeight = h - horizonY
+        let magenta = Color(red: 1.0, green: 0.25, blue: 0.75)
+        let cyan = Color(red: 0.3, green: 0.9, blue: 1.0)
+
+        // Sun: dim gradient disc with widening scanline gaps, on the horizon.
+        let sunRadius = min(w, h) * 0.17
+        let sunCenter = CGPoint(x: w * 0.5, y: horizonY - sunRadius * 0.35)
+        let sun = Path(ellipseIn: CGRect(x: sunCenter.x - sunRadius, y: sunCenter.y - sunRadius,
+                                         width: sunRadius * 2, height: sunRadius * 2))
+        ctx.drawLayer { layer in
+            layer.clip(to: Path(CGRect(x: 0, y: 0, width: w, height: horizonY)))
+            layer.fill(sun, with: .linearGradient(
+                Gradient(colors: [Color(red: 1.0, green: 0.75, blue: 0.3).opacity(0.16),
+                                  magenta.opacity(0.10)]),
+                startPoint: CGPoint(x: sunCenter.x, y: sunCenter.y - sunRadius),
+                endPoint: CGPoint(x: sunCenter.x, y: sunCenter.y + sunRadius)))
+            layer.blendMode = .clear
+            var gapY = sunCenter.y + sunRadius * 0.05
+            var gap: CGFloat = 2
+            while gapY < sunCenter.y + sunRadius {
+                layer.fill(Path(CGRect(x: sunCenter.x - sunRadius, y: gapY,
+                                       width: sunRadius * 2, height: gap)),
+                           with: .color(.black))
+                gapY += gap + sunRadius * 0.12
+                gap += 1.5
+            }
+        }
+
+        // Horizon glow line.
+        var horizon = Path()
+        horizon.move(to: CGPoint(x: 0, y: horizonY))
+        horizon.addLine(to: CGPoint(x: w, y: horizonY))
+        ctx.stroke(horizon, with: .color(cyan.opacity(0.12)), lineWidth: 1)
+
+        // Rows: equally spaced in world depth, projected as 1/depth. As phase
+        // rises each row slides toward the viewer; at depth < 1 it exits past
+        // the bottom edge just as the next row arrives — the seamless loop.
+        var rows = [(y: CGFloat, alpha: Double)]()
+        for k in 1...24 {
+            let depth = Double(k) - phase
+            guard depth > 0.05 else { continue }
+            let y = horizonY + gridHeight / CGFloat(depth)
+            guard y <= h + 2 else { continue }
+            rows.append((y, min(0.18, 0.05 + 0.13 / depth)))
+        }
+        for row in rows {
+            var line = Path()
+            line.move(to: CGPoint(x: 0, y: row.y))
+            line.addLine(to: CGPoint(x: w, y: row.y))
+            ctx.stroke(line, with: .color(magenta.opacity(row.alpha)), lineWidth: 1)
+        }
+
+        // Verticals: static fan from the vanishing point.
+        var fan = Path()
+        let bottomSpacing = w / 10
+        for i in -12...12 {
+            fan.move(to: CGPoint(x: w * 0.5, y: horizonY))
+            fan.addLine(to: CGPoint(x: w * 0.5 + CGFloat(i) * bottomSpacing, y: h))
+        }
+        ctx.stroke(fan, with: .color(magenta.opacity(0.07)), lineWidth: 1)
     }
 }
 

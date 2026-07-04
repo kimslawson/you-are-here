@@ -27,8 +27,11 @@ struct ContentView: View {
                 Theme.background.ignoresSafeArea()
 
                 // A E S T H E T I C : the optional barely-there backdrop.
+                // Neon is dark-mode only — dim glow lines have nothing to
+                // glow against on white.
                 if !needsPermission,
-                   let art = BackgroundArt(rawValue: backgroundArt), art != .off {
+                   let art = BackgroundArt(rawValue: backgroundArt), art != .off,
+                   !(art == .neon && engine.state.lightMode) {
                     BackgroundArtView(kind: art)
                 }
 
@@ -231,9 +234,10 @@ struct SettingsView: View {
                         Text("Off").tag(BackgroundArt.off.rawValue)
                         Text("Streets").tag(BackgroundArt.streets.rawValue)
                         Text("Topo").tag(BackgroundArt.topo.rawValue)
+                        Text("Neon").tag(BackgroundArt.neon.rawValue)
                     }
                     .pickerStyle(.segmented)
-                    Text("Purely aesthetic, barely-there backdrops behind the readout. Streets sketches a tilted, slowly turning abstract of nearby roads — deliberately useless for navigation (fetches geometry from OpenStreetMap; sends your location to overpass-api.de, like route lookup). Topo draws slowly drifting contour lines generated on-device — no network, not real terrain.")
+                    Text("Purely aesthetic, barely-there backdrops behind the readout. Streets sketches a tilted, slowly turning abstract of nearby roads — deliberately useless for navigation (fetches geometry from OpenStreetMap; sends your location to overpass-api.de, like route lookup). Topo draws slowly drifting contour lines generated on-device — no network, not real terrain. Neon is a dim synthwave grid that scrolls at your actual driving speed; dark mode only.")
                         .font(.footnote)
                         .foregroundColor(.secondary)
                 }

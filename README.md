@@ -78,6 +78,11 @@ When the **town, road, or compass direction changes**, that field briefly
     drifting on a ±32pt Lissajous path with ~10-minute periods: always moving,
     never noticeably. No network, no data source, not real terrain — that's
     the point.
+  - **Neon** — a dim outrun/synthwave grid (perspective rows, striped sun)
+    whose scroll rate follows your actual GPS speed (low-passed, plus a slow
+    idle crawl at rest; ~65 mph ≈ 2.4 rows/s). Loops seamlessly by
+    construction — the scene is periodic per grid row. Dark mode only: dim
+    glow has nothing to glow against on white.
 - **Easter egg:** tap the app screen 10 times in quick succession and the whole
   UI switches to Comic Sans (well, Comic Neue — iOS doesn't ship the real
   thing). Ten more taps restore whatever font you had before.

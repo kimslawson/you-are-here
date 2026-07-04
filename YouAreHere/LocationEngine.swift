@@ -26,6 +26,8 @@ final class LocationEngine: NSObject, ObservableObject {
     @Published private(set) var authorization: CLAuthorizationStatus = .notDetermined
     /// Raw fix for consumers that need geometry, not names (background art).
     @Published private(set) var lastCoordinate: CLLocationCoordinate2D?
+    /// Ground speed in m/s (≥0). Drives the neon background's scroll rate.
+    @Published private(set) var speedMPS: Double = 0
     @Published private(set) var isRunning = false
     /// "Parked": sensors frozen to save battery. Per-session only — a fresh
     /// launch always starts live, never parked.
@@ -551,6 +553,7 @@ extension LocationEngine: CLLocationManagerDelegate {
         Task { @MainActor in
             self.latestLocation = loc
             self.lastCoordinate = loc.coordinate
+            self.speedMPS = max(0, loc.speed)
             self.fuser.ingestGPS(loc)
             // Drive ticks off location too, so updates continue in the background
             // (Timers don't fire reliably when suspended; location callbacks do).
