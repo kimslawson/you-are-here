@@ -79,8 +79,8 @@ struct NeonBackground: View {
         ctx.drawLayer { layer in
             layer.clip(to: Path(CGRect(x: 0, y: 0, width: w, height: horizonY)))
             layer.fill(sun, with: .linearGradient(
-                Gradient(colors: [Color(red: 1.0, green: 0.75, blue: 0.3).opacity(0.16),
-                                  magenta.opacity(0.10)]),
+                Gradient(colors: [Color(red: 1.0, green: 0.75, blue: 0.3).opacity(0.38),
+                                  magenta.opacity(0.24)]),
                 startPoint: CGPoint(x: sunCenter.x, y: sunCenter.y - sunRadius),
                 endPoint: CGPoint(x: sunCenter.x, y: sunCenter.y + sunRadius)))
             layer.blendMode = .clear
@@ -99,7 +99,7 @@ struct NeonBackground: View {
         var horizon = Path()
         horizon.move(to: CGPoint(x: 0, y: horizonY))
         horizon.addLine(to: CGPoint(x: w, y: horizonY))
-        ctx.stroke(horizon, with: .color(cyan.opacity(0.12)), lineWidth: 1)
+        ctx.stroke(horizon, with: .color(cyan.opacity(0.25)), lineWidth: 1)
 
         // Rows: equally spaced in world depth, projected as 1/depth. As phase
         // rises each row slides toward the viewer; at depth < 1 it exits past
@@ -110,7 +110,7 @@ struct NeonBackground: View {
             guard depth > 0.05 else { continue }
             let y = horizonY + gridHeight / CGFloat(depth)
             guard y <= h + 2 else { continue }
-            rows.append((y, min(0.18, 0.05 + 0.13 / depth)))
+            rows.append((y, min(0.35, 0.10 + 0.25 / depth)))
         }
         for row in rows {
             var line = Path()
@@ -126,7 +126,7 @@ struct NeonBackground: View {
             fan.move(to: CGPoint(x: w * 0.5, y: horizonY))
             fan.addLine(to: CGPoint(x: w * 0.5 + CGFloat(i) * bottomSpacing, y: h))
         }
-        ctx.stroke(fan, with: .color(magenta.opacity(0.07)), lineWidth: 1)
+        ctx.stroke(fan, with: .color(magenta.opacity(0.16)), lineWidth: 1)
     }
 }
 
@@ -244,8 +244,8 @@ struct StreetsBackground: View {
                     p.addLines(road.points.map { CGPoint(x: $0.x * scale, y: $0.y * scale) })
                     if road.major { major.addPath(p) } else { minor.addPath(p) }
                 }
-                ctx.stroke(minor, with: .color(Theme.secondary.opacity(0.07)), lineWidth: 1)
-                ctx.stroke(major, with: .color(Theme.secondary.opacity(0.13)), lineWidth: 1.5)
+                ctx.stroke(minor, with: .color(Theme.secondary.opacity(0.15)), lineWidth: 1)
+                ctx.stroke(major, with: .color(Theme.secondary.opacity(0.26)), lineWidth: 1.5)
             }
         }
         // Tip the map plane away like an idle nav display, then fade the far
@@ -284,7 +284,7 @@ struct TopoBackground: View {
                     let t = timeline.date.timeIntervalSinceReferenceDate
                     ctx.translateBy(x: -margin + sin(t / 97) * 32,
                                     y: -margin + cos(t / 131) * 32)
-                    ctx.stroke(contours, with: .color(Theme.secondary.opacity(0.09)), lineWidth: 1)
+                    ctx.stroke(contours, with: .color(Theme.secondary.opacity(0.20)), lineWidth: 1)
                 }
             }
             .onAppear { rebuildIfNeeded(for: geo.size) }
