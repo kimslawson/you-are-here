@@ -127,6 +127,28 @@ When the **town, road, or compass direction changes**, that field briefly
   background mode. Note for distribution: Apple's review guidelines describe
   PiP as a video-playback feature, and non-video uses like this have
   historically been a rejection risk.
+- **Fast launch.** For a "hop in, go" app, getting the live session started
+  quickly matters more than any glanceable widget. Two one-tap paths, both
+  backed by `OpenYouAreHereIntent` (`Shared/LaunchIntent.swift`), which just
+  foregrounds the app — `ContentView.onAppear` does the rest (auth, engine,
+  Live Activity):
+  - **Siri / Shortcuts** — say *"Where am I in You Are Here"* (or "Open / Start
+    You Are Here"). Zero setup; the phrases ship in `AppShortcuts.swift`. Every
+    App Shortcut phrase must include the app name, but you can rename it to a
+    shorter custom phrase in the Shortcuts app.
+  - **Control Center button** (iOS 18+) — add *You Are Here* to Control Center
+    (edit ▸ + ▸ find it under controls). `LaunchControl.swift`, a `ControlWidget`
+    in the widget extension, added to the bundle behind an availability check.
+- **StandBy.** There's no home-screen/Notification-Center widget (a timeline
+  widget can't stream live location or refresh fast enough to be useful while
+  driving — the Live Activity is the right "live on a passive surface" tool and
+  it's already here). The app's StandBy story *is* the Live Activity: when the
+  phone is charging + landscape (dash mount), iOS surfaces the running Live
+  Activity, using its Lock-Screen presentation. So "StandBy-ready" mostly means
+  "have a Live Activity running and keep it legible dimmed" — nothing extra to
+  build. The aesthetic backdrops only appear there for **Topo/Neon** (Streets
+  can't ride in the activity's state budget), and StandBy's own dimming may
+  wash the subtle ones out.
 
 ## How it updates
 
@@ -306,8 +328,12 @@ YouAreHere/                     App target
   AltitudeFuser                 GPS + barometer fusion
   Settings                      UserDefaults keys
   MetricsLogger                 MetricKit perf logging (METRICS_LOGGING flag)
+  AppShortcuts                  Siri phrases / Shortcuts action (fast launch)
 YouAreHereWidget/               Widget extension target
   YouAreHereLiveActivity        Lock Screen + Dynamic Island presentations
+  LaunchControl                 Control Center launch button (iOS 18+)
+Shared/
+  LaunchIntent                  OpenYouAreHereIntent (Siri + Control Center)
 design/
   appicon.py                    Regenerates the app icon (run with Pillow)
 ```
