@@ -72,7 +72,9 @@ When the **town, road, or compass direction changes**, that field briefly
   functions) so all surfaces share it: animated in the app, static-per-frame
   in PiP (~1/s) and the Live Activity (per content update; the choice rides
   in `ContentState.backgroundID`). Streets is app + PiP only — road geometry
-  can't fit ActivityKit's ~4KB state budget. Hosts/fetching in
+  can't fit ActivityKit's ~4KB state budget. A **Contrast** slider
+  (0.4×–2.4×, default 1×) multiplies every backdrop's opacity on all
+  surfaces (`ContentState.backgroundContrast`). Hosts/fetching in
   `YouAreHere/BackgroundArt.swift`:
   - **Streets** — nearby roads as faint strokes on a perspective-tilted plane,
     rotating once per 25 minutes, fading toward the horizon. Deliberately too

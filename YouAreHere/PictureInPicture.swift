@@ -243,14 +243,17 @@ struct PiPFrameView: View {
                 case .streets:
                     BackgroundArtRenderer.drawStreets(
                         &ctx, size: size, roads: StreetMapModel.shared.roads,
-                        angle: BackgroundArtRenderer.streetsAutoAngle(at: Date()))
+                        angle: BackgroundArtRenderer.streetsAutoAngle(at: Date()),
+                        contrast: state.backgroundContrast)
                 case .topo:
                     let path = BackgroundArtRenderer.topoContours(size: size)
-                    BackgroundArtRenderer.drawTopo(&ctx, size: size, path: path, date: Date())
+                    BackgroundArtRenderer.drawTopo(&ctx, size: size, path: path, date: Date(),
+                                                   contrast: state.backgroundContrast)
                 case .neon:
                     BackgroundArtRenderer.drawNeon(
                         &ctx, size: size,
-                        phase: BackgroundArtRenderer.neonAutoPhase(at: Date()))
+                        phase: BackgroundArtRenderer.neonAutoPhase(at: Date()),
+                        contrast: state.backgroundContrast)
                 default:
                     break
                 }

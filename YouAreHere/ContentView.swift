@@ -205,6 +205,7 @@ struct SettingsView: View {
     @AppStorage(SettingsKey.customFlashColor) private var customFlashColor = false
     @AppStorage(SettingsKey.flashColorHex) private var flashColorHex = "FFFFFF"
     @AppStorage(SettingsKey.backgroundArt) private var backgroundArt = BackgroundArt.off.rawValue
+    @AppStorage(SettingsKey.backgroundContrast) private var backgroundContrast = 1.0
 
     /// ColorPicker binding backed by the hex string in UserDefaults.
     private var flashColorBinding: Binding<Color> {
@@ -238,6 +239,16 @@ struct SettingsView: View {
                     }
                     .pickerStyle(.segmented)
                     .onChange(of: backgroundArt) { _ in engine.reloadAppearance() }
+                    if backgroundArt != BackgroundArt.off.rawValue {
+                        HStack {
+                            Text("Contrast")
+                            // App preview updates live (views read the value
+                            // directly); Live Activity/PiP sync on release.
+                            Slider(value: $backgroundContrast, in: 0.4...2.4) { editing in
+                                if !editing { engine.reloadAppearance() }
+                            }
+                        }
+                    }
                     Text("Purely aesthetic, dim backdrops behind the readout — also on the Live Activity and floating window (updating with the readout, about once a second). Streets sketches a tilted, slowly turning abstract of nearby roads — deliberately useless for navigation (fetches geometry from OpenStreetMap; sends your location to overpass-api.de, like route lookup; app and floating window only). Topo draws slowly drifting contour lines generated on-device — no network, not real terrain. Neon is a synthwave grid that scrolls at your actual driving speed; dark mode only.")
                         .font(.footnote)
                         .foregroundColor(.secondary)

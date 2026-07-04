@@ -22,7 +22,7 @@ struct BackgroundArtView: View {
 // MARK: - Streets (Overpass geometry, tilted like an idle nav display)
 
 /// Fetches nearby road geometry from Overpass, sparsely: once on the first
-/// fix, then only after moving ~400m, never more often than every 2 minutes.
+/// fix, then only after moving ~300m, never more often than every 2 minutes.
 /// Shared singleton so the PiP frame renderer can draw the same map.
 @MainActor
 final class StreetMapModel: ObservableObject {
@@ -39,7 +39,7 @@ final class StreetMapModel: ObservableObject {
         guard !inFlight else { return }
         let movedEnough = center.map {
             CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
-                .distance(from: CLLocation(latitude: $0.latitude, longitude: $0.longitude)) > 400
+                .distance(from: CLLocation(latitude: $0.latitude, longitude: $0.longitude)) > 300
         } ?? true
         // Sparse by design (fair use): 2 min between refreshes once we have a
         // map; a gentler 20s retry while we're still waiting for the first one.
@@ -65,7 +65,7 @@ final class StreetMapModel: ObservableObject {
         let lat = coordinate.latitude
         let lon = coordinate.longitude
         let query = """
-        [out:json][timeout:10];way(around:1000,\(lat),\(lon))[highway]\
+        [out:json][timeout:10];way(around:600,\(lat),\(lon))[highway]\
         [highway!~"footway|path|cycleway|steps|pedestrian|bridleway|construction|proposed"];\
         out geom 600;
         """
@@ -112,13 +112,15 @@ final class StreetMapModel: ObservableObject {
 struct StreetsBackground: View {
     @EnvironmentObject private var engine: LocationEngine
     @ObservedObject private var model = StreetMapModel.shared
+    @AppStorage(SettingsKey.backgroundContrast) private var contrast = 1.0
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 0.5)) { timeline in
             Canvas { ctx, size in
                 BackgroundArtRenderer.drawStreets(
                     &ctx, size: size, roads: model.roads,
-                    angle: BackgroundArtRenderer.streetsAutoAngle(at: timeline.date))
+                    angle: BackgroundArtRenderer.streetsAutoAngle(at: timeline.date),
+                    contrast: contrast)
             }
         }
         // Tip the map plane away like an idle nav display, then fade the far
@@ -150,6 +152,7 @@ private final class TopoCache {
 
 struct TopoBackground: View {
     @State private var cache = TopoCache()
+    @AppStorage(SettingsKey.backgroundContrast) private var contrast = 1.0
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 0.5)) { timeline in
@@ -159,7 +162,7 @@ struct TopoBackground: View {
                     cache.path = BackgroundArtRenderer.topoContours(size: size)
                 }
                 BackgroundArtRenderer.drawTopo(&ctx, size: size, path: cache.path,
-                                               date: timeline.date)
+                                               date: timeline.date, contrast: contrast)
             }
         }
         .ignoresSafeArea()
@@ -177,11 +180,12 @@ struct NeonBackground: View {
     @State private var phase = 0.0           // grid scroll, wraps every row
     @State private var smoothedSpeed = 0.0   // m/s, low-passed
     @State private var lastTick: Date?
+    @AppStorage(SettingsKey.backgroundContrast) private var contrast = 1.0
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1.0 / 24)) { timeline in
             Canvas { ctx, size in
-                BackgroundArtRenderer.drawNeon(&ctx, size: size, phase: phase)
+                BackgroundArtRenderer.drawNeon(&ctx, size: size, phase: phase, contrast: contrast)
             }
             .onChange(of: timeline.date) { now in
                 let dt = lastTick.map { min(now.timeIntervalSince($0), 0.5) } ?? 0

@@ -13,6 +13,7 @@ enum SettingsKey {
     static let appFont = "appFont"
     static let lightMode = "lightMode"
     static let backgroundArt = "backgroundArt"
+    static let backgroundContrast = "backgroundContrast"
     static let customFlashColor = "customFlashColor"
     static let flashColorHex = "flashColorHex"
     /// The font in use before the Easter egg switched to Comic, for the way back.

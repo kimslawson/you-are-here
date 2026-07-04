@@ -22,6 +22,7 @@ final class LocationEngine: NSObject, ObservableObject {
         unitIsMetric: false, fontID: AppFont.helvetica.rawValue,
         lightMode: false, flashHex: nil,
         backgroundID: BackgroundArt.off.rawValue,
+        backgroundContrast: 1,
         hasSignal: true, isPaused: false, speedLimitKmh: nil,
         townChanged: false, roadChanged: false, headingChanged: false, speedLimitChanged: false)
     @Published private(set) var authorization: CLAuthorizationStatus = .notDetermined
@@ -114,6 +115,7 @@ final class LocationEngine: NSObject, ObservableObject {
         state.lightMode = appearance.light
         state.flashHex = appearance.flashHex
         state.backgroundID = appearance.backgroundID
+        state.backgroundContrast = appearance.backgroundContrast
         applyRefreshConfiguration()   // sets accuracy + distance/heading filters
         updateHeadingOrientation()
 
@@ -267,7 +269,7 @@ final class LocationEngine: NSObject, ObservableObject {
     /// Read the appearance settings, apply them to this process's Theme, and
     /// return the values to carry in ContentState (for the widget process).
     private func refreshAppearance() -> (fontID: String, light: Bool, flashHex: String?,
-                                         backgroundID: String) {
+                                         backgroundID: String, backgroundContrast: Double) {
         let defaults = UserDefaults.standard
         let light = defaults.bool(forKey: SettingsKey.lightMode)
         let flashHex = defaults.bool(forKey: SettingsKey.customFlashColor)
@@ -275,7 +277,9 @@ final class LocationEngine: NSObject, ObservableObject {
         Theme.apply(light: light, flashHex: flashHex)
         let background = defaults.string(forKey: SettingsKey.backgroundArt)
             ?? BackgroundArt.off.rawValue
-        return (AppFont.current().rawValue, light, flashHex, background)
+        let contrast = defaults.object(forKey: SettingsKey.backgroundContrast) == nil
+            ? 1.0 : defaults.double(forKey: SettingsKey.backgroundContrast)
+        return (AppFont.current().rawValue, light, flashHex, background, contrast)
     }
 
     private func suspendSensors() {
@@ -363,6 +367,7 @@ final class LocationEngine: NSObject, ObservableObject {
             unitIsMetric: metric, fontID: appearance.fontID,
             lightMode: appearance.light, flashHex: appearance.flashHex,
             backgroundID: appearance.backgroundID,
+            backgroundContrast: appearance.backgroundContrast,
             hasSignal: networkAvailable, isPaused: false,
             speedLimitKmh: speedKmh,
             townChanged: townChanged, roadChanged: roadChanged, headingChanged: headingChanged,
@@ -402,6 +407,7 @@ final class LocationEngine: NSObject, ObservableObject {
         s.lightMode = appearance.light
         s.flashHex = appearance.flashHex
         s.backgroundID = appearance.backgroundID
+        s.backgroundContrast = appearance.backgroundContrast
         s.townChanged = false
         s.roadChanged = false
         s.headingChanged = false

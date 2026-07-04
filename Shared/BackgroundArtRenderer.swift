@@ -42,13 +42,14 @@ enum BackgroundArtRenderer {
                                           height: size.height + topoMargin * 2 + 64))
     }
 
-    static func drawTopo(_ ctx: inout GraphicsContext, size: CGSize, path: Path, date: Date) {
+    static func drawTopo(_ ctx: inout GraphicsContext, size: CGSize, path: Path, date: Date,
+                         contrast: Double = 1) {
         // Lissajous drift, ±32pt over ~10/13-minute periods: technically
         // always moving, practically imperceptible.
         let t = date.timeIntervalSinceReferenceDate
         ctx.translateBy(x: -topoMargin + sin(t / 97) * 32,
                         y: -topoMargin + cos(t / 131) * 32)
-        ctx.stroke(path, with: .color(Theme.secondary.opacity(0.30)), lineWidth: 1.2)
+        ctx.stroke(path, with: .color(Theme.secondary.opacity(min(1, 0.30 * contrast))), lineWidth: 1.2)
     }
 
     // MARK: Streets
@@ -60,8 +61,8 @@ enum BackgroundArtRenderer {
     }
 
     static func drawStreets(_ ctx: inout GraphicsContext, size: CGSize,
-                            roads: [RoadStroke], angle: Angle) {
-        let scale = min(size.width, size.height) / 1600   // 1km radius ≈ 62% of min side
+                            roads: [RoadStroke], angle: Angle, contrast: Double = 1) {
+        let scale = min(size.width, size.height) / 1000   // 600m radius overfills the min side
         ctx.translateBy(x: size.width / 2, y: size.height / 2)
         ctx.rotate(by: angle)
 
@@ -71,8 +72,8 @@ enum BackgroundArtRenderer {
             p.addLines(road.points.map { CGPoint(x: $0.x * scale, y: $0.y * scale) })
             if road.major { major.addPath(p) } else { minor.addPath(p) }
         }
-        ctx.stroke(minor, with: .color(Theme.secondary.opacity(0.25)), lineWidth: 1.2)
-        ctx.stroke(major, with: .color(Theme.secondary.opacity(0.40)), lineWidth: 1.8)
+        ctx.stroke(minor, with: .color(Theme.secondary.opacity(min(1, 0.25 * contrast))), lineWidth: 1.2)
+        ctx.stroke(major, with: .color(Theme.secondary.opacity(min(1, 0.40 * contrast))), lineWidth: 1.8)
     }
 
     // MARK: Neon
@@ -83,7 +84,8 @@ enum BackgroundArtRenderer {
         (date.timeIntervalSinceReferenceDate * 0.25).truncatingRemainder(dividingBy: 1)
     }
 
-    static func drawNeon(_ ctx: inout GraphicsContext, size: CGSize, phase: Double) {
+    static func drawNeon(_ ctx: inout GraphicsContext, size: CGSize, phase: Double,
+                         contrast: Double = 1) {
         let w = size.width, h = size.height
         let horizonY = h * 0.42
         let gridHeight = h - horizonY
@@ -98,8 +100,8 @@ enum BackgroundArtRenderer {
         ctx.drawLayer { layer in
             layer.clip(to: Path(CGRect(x: 0, y: 0, width: w, height: horizonY)))
             layer.fill(sun, with: .linearGradient(
-                Gradient(colors: [Color(red: 1.0, green: 0.75, blue: 0.3).opacity(0.50),
-                                  magenta.opacity(0.32)]),
+                Gradient(colors: [Color(red: 1.0, green: 0.75, blue: 0.3).opacity(min(1, 0.50 * contrast)),
+                                  magenta.opacity(min(1, 0.32 * contrast))]),
                 startPoint: CGPoint(x: sunCenter.x, y: sunCenter.y - sunRadius),
                 endPoint: CGPoint(x: sunCenter.x, y: sunCenter.y + sunRadius)))
             layer.blendMode = .clear
@@ -118,7 +120,7 @@ enum BackgroundArtRenderer {
         var horizon = Path()
         horizon.move(to: CGPoint(x: 0, y: horizonY))
         horizon.addLine(to: CGPoint(x: w, y: horizonY))
-        ctx.stroke(horizon, with: .color(cyan.opacity(0.32)), lineWidth: 1)
+        ctx.stroke(horizon, with: .color(cyan.opacity(min(1, 0.32 * contrast))), lineWidth: 1)
 
         // Rows: equally spaced in world depth, projected as 1/depth. As phase
         // rises each row slides toward the viewer; at depth < 1 it exits past
@@ -131,7 +133,7 @@ enum BackgroundArtRenderer {
             var line = Path()
             line.move(to: CGPoint(x: 0, y: y))
             line.addLine(to: CGPoint(x: w, y: y))
-            ctx.stroke(line, with: .color(magenta.opacity(min(0.45, 0.14 + 0.32 / depth))),
+            ctx.stroke(line, with: .color(magenta.opacity(min(1, min(0.45, 0.14 + 0.32 / depth) * contrast))),
                        lineWidth: 1)
         }
 
@@ -142,7 +144,7 @@ enum BackgroundArtRenderer {
             fan.move(to: CGPoint(x: w * 0.5, y: horizonY))
             fan.addLine(to: CGPoint(x: w * 0.5 + CGFloat(i) * bottomSpacing, y: h))
         }
-        ctx.stroke(fan, with: .color(magenta.opacity(0.22)), lineWidth: 1)
+        ctx.stroke(fan, with: .color(magenta.opacity(min(1, 0.22 * contrast))), lineWidth: 1)
     }
 }
 

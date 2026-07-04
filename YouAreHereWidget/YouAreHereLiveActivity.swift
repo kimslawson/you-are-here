@@ -111,11 +111,13 @@ struct YouAreHereLiveActivity: Widget {
                 switch art {
                 case .topo:
                     let path = BackgroundArtRenderer.topoContours(size: size)
-                    BackgroundArtRenderer.drawTopo(&ctx, size: size, path: path, date: Date())
+                    BackgroundArtRenderer.drawTopo(&ctx, size: size, path: path, date: Date(),
+                                                   contrast: s.backgroundContrast)
                 case .neon:
                     BackgroundArtRenderer.drawNeon(
                         &ctx, size: size,
-                        phase: BackgroundArtRenderer.neonAutoPhase(at: Date()))
+                        phase: BackgroundArtRenderer.neonAutoPhase(at: Date()),
+                        contrast: s.backgroundContrast)
                 default:
                     break
                 }
