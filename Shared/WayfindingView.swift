@@ -88,6 +88,17 @@ struct WayfindingView<Trailing: View>: View {
         .padding(.leading, smallSize * 0.1)
     }
 
+    /// Width the scaled-up speed sign overflows into the town line. Reserved as
+    /// trailing padding so long names scale down to clear it instead of running
+    /// underneath (the sign draws ~0.75× as wide as its visual height, plus a
+    /// small gap). Zero when there's no sign or no overflow (landscape).
+    private var townTrailingReserve: CGFloat {
+        guard speedSignScale > 1,
+              Formatting.speedLimitValue(kmh: state.speedLimitKmh, metric: state.unitIsMetric) != nil
+        else { return 0 }
+        return townSize * 0.5 * speedSignScale * 0.75 + smallSize * 0.5
+    }
+
     // MARK: Line 2 — town (the headline)
     private var townLine: some View {
         Text(state.town.isEmpty ? state.townPlaceholder : state.town)
@@ -96,6 +107,7 @@ struct WayfindingView<Trailing: View>: View {
                                              base: state.town.isEmpty ? Theme.muted : Theme.primary))
             .lineLimit(1)
             .minimumScaleFactor(0.4)
+            .padding(.trailing, townTrailingReserve)
             .frame(maxWidth: .infinity, alignment: frameAlignment)
             // Optical centering: the font's line box reserves headroom above cap
             // height (diacritics) that a title-case name never fills, so metric
