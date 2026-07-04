@@ -9,6 +9,7 @@ struct ContentView: View {
     @AppStorage(SettingsKey.unitIsMetric) private var unitIsMetric = false
     @AppStorage(SettingsKey.pictureInPicture) private var pictureInPicture = false
     @AppStorage(SettingsKey.pipLargeWindow) private var pipLargeWindow = false
+    @AppStorage(SettingsKey.backgroundArt) private var backgroundArt = BackgroundArt.off.rawValue
     @StateObject private var pip = PiPManager()
     @State private var showSettings = false
     /// Landscape-only: the gear is hidden until a tap reveals it (it shares the
@@ -24,6 +25,12 @@ struct ContentView: View {
             let isPortrait = geo.size.height >= geo.size.width
             ZStack {
                 Theme.background.ignoresSafeArea()
+
+                // A E S T H E T I C : the optional barely-there backdrop.
+                if !needsPermission,
+                   let art = BackgroundArt(rawValue: backgroundArt), art != .off {
+                    BackgroundArtView(kind: art)
+                }
 
                 // Offscreen-ish host for the PiP video layer (must be in the
                 // hierarchy for AVKit to float it).
@@ -194,6 +201,7 @@ struct SettingsView: View {
     @AppStorage(SettingsKey.lightMode) private var lightMode = false
     @AppStorage(SettingsKey.customFlashColor) private var customFlashColor = false
     @AppStorage(SettingsKey.flashColorHex) private var flashColorHex = "FFFFFF"
+    @AppStorage(SettingsKey.backgroundArt) private var backgroundArt = BackgroundArt.off.rawValue
 
     /// ColorPicker binding backed by the hex string in UserDefaults.
     private var flashColorBinding: Binding<Color> {
@@ -217,6 +225,15 @@ struct SettingsView: View {
                         ColorPicker("Flash color", selection: flashColorBinding, supportsOpacity: false)
                     }
                     Text("Light mode inverts the readout's black/white/gray palette. Fields briefly flash when their value changes — white by default (black in light mode), or a color of your choosing.")
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                    Picker("Background", selection: $backgroundArt) {
+                        Text("Off").tag(BackgroundArt.off.rawValue)
+                        Text("Streets").tag(BackgroundArt.streets.rawValue)
+                        Text("Topo").tag(BackgroundArt.topo.rawValue)
+                    }
+                    .pickerStyle(.segmented)
+                    Text("Purely aesthetic, barely-there backdrops behind the readout. Streets sketches a tilted, slowly turning abstract of nearby roads — deliberately useless for navigation (fetches geometry from OpenStreetMap; sends your location to overpass-api.de, like route lookup). Topo draws slowly drifting contour lines generated on-device — no network, not real terrain.")
                         .font(.footnote)
                         .foregroundColor(.secondary)
                 }

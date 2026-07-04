@@ -66,6 +66,18 @@ When the **town, road, or compass direction changes**, that field briefly
   the black/white/gray values) and a **custom flash color** (color picker,
   stored as hex; default is white — black in light mode). Both travel to the
   widget inside `ContentState`, like the font and units.
+- **Backgrounds (opt-in, purely aesthetic):** *Settings ▸ Appearance ▸
+  Background.* Barely-there backdrops behind the readout, inspired by idle
+  car-nav displays (see `BackgroundArt.swift`):
+  - **Streets** — nearby roads as faint strokes on a perspective-tilted plane,
+    rotating once per 25 minutes, fading toward the horizon. Deliberately too
+    abstract to navigate by. Fetches geometry from Overpass sparsely (first
+    fix, then only after ~400m of movement, ≥2min apart) — sends your location
+    to `overpass-api.de`, same caveat as route lookup.
+  - **Topo** — contour lines over on-device fractal noise (marching squares),
+    drifting on a ±32pt Lissajous path with ~10-minute periods: always moving,
+    never noticeably. No network, no data source, not real terrain — that's
+    the point.
 - **Easter egg:** tap the app screen 10 times in quick succession and the whole
   UI switches to Comic Sans (well, Comic Neue — iOS doesn't ship the real
   thing). Ten more taps restore whatever font you had before.

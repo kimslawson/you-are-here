@@ -24,6 +24,8 @@ final class LocationEngine: NSObject, ObservableObject {
         hasSignal: true, isPaused: false, speedLimitKmh: nil,
         townChanged: false, roadChanged: false, headingChanged: false, speedLimitChanged: false)
     @Published private(set) var authorization: CLAuthorizationStatus = .notDetermined
+    /// Raw fix for consumers that need geometry, not names (background art).
+    @Published private(set) var lastCoordinate: CLLocationCoordinate2D?
     @Published private(set) var isRunning = false
     /// "Parked": sensors frozen to save battery. Per-session only — a fresh
     /// launch always starts live, never parked.
@@ -548,6 +550,7 @@ extension LocationEngine: CLLocationManagerDelegate {
         guard let loc = locations.last else { return }
         Task { @MainActor in
             self.latestLocation = loc
+            self.lastCoordinate = loc.coordinate
             self.fuser.ingestGPS(loc)
             // Drive ticks off location too, so updates continue in the background
             // (Timers don't fire reliably when suspended; location callbacks do).
