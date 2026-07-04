@@ -164,9 +164,13 @@ struct SeparatorDot: View {
     var color: Color = Theme.secondary
 
     var body: some View {
+        // Chunkier than a typographic middot (~0.11em): drawn in isolation it
+        // needs more mass to read as intentional, and a floor keeps it from
+        // shrinking to dust at Live Activity / Dynamic Island sizes.
+        let diameter = max(2.5, size * 0.2)
         Circle()
             .fill(color)
-            .frame(width: size * 0.13, height: size * 0.13)
+            .frame(width: diameter, height: diameter)
     }
 }
 
