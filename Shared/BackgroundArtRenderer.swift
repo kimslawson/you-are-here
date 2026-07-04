@@ -1,0 +1,239 @@
+import SwiftUI
+
+/// Purely-aesthetic background layers (Settings ▸ Appearance ▸ Background).
+/// Inspired by idle car-nav displays: dim, deliberately too abstract to
+/// navigate by, and slow enough that nothing pulls the eye.
+enum BackgroundArt: String, CaseIterable, Identifiable {
+    case off
+    /// A perspective-tilted, slowly rotating sketch of nearby roads (OSM).
+    /// App + PiP only: road geometry can't ride in the Live Activity's state
+    /// (ActivityKit budgets content to ~4KB) and widgets can't fetch.
+    case streets
+    /// Slowly drifting topographic contour lines, generated on-device.
+    case topo
+    /// Dim synthwave grid whose scroll speed follows GPS speed (in the app;
+    /// elsewhere it rolls at a steady idle). Dark mode only.
+    case neon
+
+    var id: String { rawValue }
+}
+
+/// One road polyline, in meters east/north of the fetch center.
+struct RoadStroke {
+    let points: [CGPoint]
+    let major: Bool   // motorway/trunk/primary get a brighter stroke
+}
+
+/// Pure drawing for the three effects, shared by the app screen (animated),
+/// the PiP frames (~1 fps), and the Live Activity (static per update).
+/// All state comes in as parameters; nothing here fetches or animates.
+enum BackgroundArtRenderer {
+
+    // MARK: Topo
+
+    /// Canvas padding beyond the visible size so the drift never shows an edge.
+    static let topoMargin: CGFloat = 44
+
+    /// Contour lines over fractal value noise (marching squares). Pure and
+    /// deterministic per size — cacheable by the caller, cheap enough to
+    /// recompute per render for small canvases (PiP, Live Activity).
+    static func topoContours(size: CGSize) -> Path {
+        TopoField().contours(size: CGSize(width: size.width + topoMargin * 2 + 64,
+                                          height: size.height + topoMargin * 2 + 64))
+    }
+
+    static func drawTopo(_ ctx: inout GraphicsContext, size: CGSize, path: Path, date: Date) {
+        // Lissajous drift, ±32pt over ~10/13-minute periods: technically
+        // always moving, practically imperceptible.
+        let t = date.timeIntervalSinceReferenceDate
+        ctx.translateBy(x: -topoMargin + sin(t / 97) * 32,
+                        y: -topoMargin + cos(t / 131) * 32)
+        ctx.stroke(path, with: .color(Theme.secondary.opacity(0.30)), lineWidth: 1.2)
+    }
+
+    // MARK: Streets
+
+    /// A slow turntable for contexts without their own drift state: one full
+    /// rotation every 25 minutes.
+    static func streetsAutoAngle(at date: Date) -> Angle {
+        .degrees(date.timeIntervalSinceReferenceDate * 360 / 1500)
+    }
+
+    static func drawStreets(_ ctx: inout GraphicsContext, size: CGSize,
+                            roads: [RoadStroke], angle: Angle) {
+        let scale = min(size.width, size.height) / 1600   // 1km radius ≈ 62% of min side
+        ctx.translateBy(x: size.width / 2, y: size.height / 2)
+        ctx.rotate(by: angle)
+
+        var minor = Path(), major = Path()
+        for road in roads {
+            var p = Path()
+            p.addLines(road.points.map { CGPoint(x: $0.x * scale, y: $0.y * scale) })
+            if road.major { major.addPath(p) } else { minor.addPath(p) }
+        }
+        ctx.stroke(minor, with: .color(Theme.secondary.opacity(0.25)), lineWidth: 1.2)
+        ctx.stroke(major, with: .color(Theme.secondary.opacity(0.40)), lineWidth: 1.8)
+    }
+
+    // MARK: Neon
+
+    /// Steady scroll for contexts that can't integrate speed (PiP frames,
+    /// Live Activity renders): the idle-crawl rate.
+    static func neonAutoPhase(at date: Date) -> Double {
+        (date.timeIntervalSinceReferenceDate * 0.25).truncatingRemainder(dividingBy: 1)
+    }
+
+    static func drawNeon(_ ctx: inout GraphicsContext, size: CGSize, phase: Double) {
+        let w = size.width, h = size.height
+        let horizonY = h * 0.42
+        let gridHeight = h - horizonY
+        let magenta = Color(red: 1.0, green: 0.25, blue: 0.75)
+        let cyan = Color(red: 0.3, green: 0.9, blue: 1.0)
+
+        // Sun: gradient disc with widening scanline gaps, on the horizon.
+        let sunRadius = min(w, h) * 0.17
+        let sunCenter = CGPoint(x: w * 0.5, y: horizonY - sunRadius * 0.35)
+        let sun = Path(ellipseIn: CGRect(x: sunCenter.x - sunRadius, y: sunCenter.y - sunRadius,
+                                         width: sunRadius * 2, height: sunRadius * 2))
+        ctx.drawLayer { layer in
+            layer.clip(to: Path(CGRect(x: 0, y: 0, width: w, height: horizonY)))
+            layer.fill(sun, with: .linearGradient(
+                Gradient(colors: [Color(red: 1.0, green: 0.75, blue: 0.3).opacity(0.50),
+                                  magenta.opacity(0.32)]),
+                startPoint: CGPoint(x: sunCenter.x, y: sunCenter.y - sunRadius),
+                endPoint: CGPoint(x: sunCenter.x, y: sunCenter.y + sunRadius)))
+            layer.blendMode = .clear
+            var gapY = sunCenter.y + sunRadius * 0.05
+            var gap: CGFloat = 2
+            while gapY < sunCenter.y + sunRadius {
+                layer.fill(Path(CGRect(x: sunCenter.x - sunRadius, y: gapY,
+                                       width: sunRadius * 2, height: gap)),
+                           with: .color(.black))
+                gapY += gap + sunRadius * 0.12
+                gap += 1.5
+            }
+        }
+
+        // Horizon glow line.
+        var horizon = Path()
+        horizon.move(to: CGPoint(x: 0, y: horizonY))
+        horizon.addLine(to: CGPoint(x: w, y: horizonY))
+        ctx.stroke(horizon, with: .color(cyan.opacity(0.32)), lineWidth: 1)
+
+        // Rows: equally spaced in world depth, projected as 1/depth. As phase
+        // rises each row slides toward the viewer; at depth < 1 it exits past
+        // the bottom edge just as the next row arrives — the seamless loop.
+        for k in 1...24 {
+            let depth = Double(k) - phase
+            guard depth > 0.05 else { continue }
+            let y = horizonY + gridHeight / CGFloat(depth)
+            guard y <= h + 2 else { continue }
+            var line = Path()
+            line.move(to: CGPoint(x: 0, y: y))
+            line.addLine(to: CGPoint(x: w, y: y))
+            ctx.stroke(line, with: .color(magenta.opacity(min(0.45, 0.14 + 0.32 / depth))),
+                       lineWidth: 1)
+        }
+
+        // Verticals: static fan from the vanishing point.
+        var fan = Path()
+        let bottomSpacing = w / 10
+        for i in -12...12 {
+            fan.move(to: CGPoint(x: w * 0.5, y: horizonY))
+            fan.addLine(to: CGPoint(x: w * 0.5 + CGFloat(i) * bottomSpacing, y: h))
+        }
+        ctx.stroke(fan, with: .color(magenta.opacity(0.22)), lineWidth: 1)
+    }
+}
+
+/// Fractal value noise + marching squares = contour lines.
+struct TopoField {
+    var seed: UInt64 = 0x5EED_1A7E
+
+    /// Deterministic lattice hash in [0, 1).
+    private func lattice(_ x: Int, _ y: Int) -> Double {
+        var h = UInt64(bitPattern: Int64(x)) &* 0x9E3779B97F4A7C15
+        h ^= UInt64(bitPattern: Int64(y)) &* 0xC2B2AE3D27D4EB4F
+        h ^= seed
+        h = (h ^ (h >> 31)) &* 0xD6E8FEB86659FD93
+        h ^= h >> 32
+        return Double(h & 0xFFFFFF) / Double(0x1000000)
+    }
+
+    private func valueNoise(_ x: Double, _ y: Double) -> Double {
+        let x0 = Int(floor(x)), y0 = Int(floor(y))
+        let fx = x - floor(x), fy = y - floor(y)
+        // Smoothstep, so contours come out rounded rather than faceted.
+        let sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy)
+        let a = lattice(x0, y0), b = lattice(x0 + 1, y0)
+        let c = lattice(x0, y0 + 1), d = lattice(x0 + 1, y0 + 1)
+        return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy
+    }
+
+    /// 4-octave fBm; base wavelength ~240pt reads as unhurried terrain.
+    private func height(_ x: Double, _ y: Double) -> Double {
+        var value = 0.0, amplitude = 0.5, frequency = 1.0 / 240
+        for _ in 0..<4 {
+            value += amplitude * valueNoise(x * frequency, y * frequency)
+            amplitude *= 0.5
+            frequency *= 2
+        }
+        return value
+    }
+
+    /// Marching squares over a coarse grid, several ISO levels.
+    func contours(size: CGSize, cell: CGFloat = 8) -> Path {
+        let cols = Int(size.width / cell) + 1
+        let rows = Int(size.height / cell) + 1
+        var field = [Double](repeating: 0, count: (cols + 1) * (rows + 1))
+        for j in 0...rows {
+            for i in 0...cols {
+                field[j * (cols + 1) + i] = height(Double(i) * cell, Double(j) * cell)
+            }
+        }
+
+        var path = Path()
+        for level in stride(from: 0.32, through: 0.68, by: 0.06) {
+            for j in 0..<rows {
+                for i in 0..<cols {
+                    let tl = field[j * (cols + 1) + i]
+                    let tr = field[j * (cols + 1) + i + 1]
+                    let bl = field[(j + 1) * (cols + 1) + i]
+                    let br = field[(j + 1) * (cols + 1) + i + 1]
+                    let x = CGFloat(i) * cell, y = CGFloat(j) * cell
+
+                    // Interpolated crossing point on each cell edge.
+                    func lerp(_ a: Double, _ b: Double) -> CGFloat {
+                        CGFloat((level - a) / (b - a))
+                    }
+                    let top = CGPoint(x: x + lerp(tl, tr) * cell, y: y)
+                    let bottom = CGPoint(x: x + lerp(bl, br) * cell, y: y + cell)
+                    let left = CGPoint(x: x, y: y + lerp(tl, bl) * cell)
+                    let right = CGPoint(x: x + cell, y: y + lerp(tr, br) * cell)
+
+                    var index = 0
+                    if tl > level { index |= 8 }
+                    if tr > level { index |= 4 }
+                    if br > level { index |= 2 }
+                    if bl > level { index |= 1 }
+
+                    func segment(_ a: CGPoint, _ b: CGPoint) {
+                        path.move(to: a); path.addLine(to: b)
+                    }
+                    switch index {
+                    case 1, 14:  segment(left, bottom)
+                    case 2, 13:  segment(bottom, right)
+                    case 3, 12:  segment(left, right)
+                    case 4, 11:  segment(top, right)
+                    case 5:      segment(left, top); segment(bottom, right)
+                    case 6, 9:   segment(top, bottom)
+                    case 7, 8:   segment(left, top)
+                    case 10:     segment(top, right); segment(left, bottom)
+                    default:     break   // 0, 15: no crossing
+                    }
+                }
+            }
+        }
+        return path
+    }
+}

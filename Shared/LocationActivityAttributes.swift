@@ -46,6 +46,9 @@ struct LocationActivityAttributes: ActivityAttributes {
         var lightMode: Bool
         /// Custom flash color as "RRGGBB", or nil for the default flash.
         var flashHex: String?
+        /// Aesthetic backdrop (`BackgroundArt` raw value); carried so the Live
+        /// Activity can draw the procedural ones (topo/neon).
+        var backgroundID: String
         /// False when we have no network and names are stale.
         var hasSignal: Bool
         /// True when "parked" — sensors are frozen to save battery.
@@ -83,6 +86,7 @@ struct LocationActivityAttributes: ActivityAttributes {
                 fontID: AppFont.helvetica.rawValue,
                 lightMode: false,
                 flashHex: nil,
+                backgroundID: BackgroundArt.off.rawValue,
                 hasSignal: true,
                 isPaused: false,
                 speedLimitKmh: 72,

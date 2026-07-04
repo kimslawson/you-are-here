@@ -237,7 +237,8 @@ struct SettingsView: View {
                         Text("Neon").tag(BackgroundArt.neon.rawValue)
                     }
                     .pickerStyle(.segmented)
-                    Text("Purely aesthetic, barely-there backdrops behind the readout. Streets sketches a tilted, slowly turning abstract of nearby roads — deliberately useless for navigation (fetches geometry from OpenStreetMap; sends your location to overpass-api.de, like route lookup). Topo draws slowly drifting contour lines generated on-device — no network, not real terrain. Neon is a dim synthwave grid that scrolls at your actual driving speed; dark mode only.")
+                    .onChange(of: backgroundArt) { _ in engine.reloadAppearance() }
+                    Text("Purely aesthetic, dim backdrops behind the readout — also on the Live Activity and floating window (updating with the readout, about once a second). Streets sketches a tilted, slowly turning abstract of nearby roads — deliberately useless for navigation (fetches geometry from OpenStreetMap; sends your location to overpass-api.de, like route lookup; app and floating window only). Topo draws slowly drifting contour lines generated on-device — no network, not real terrain. Neon is a synthwave grid that scrolls at your actual driving speed; dark mode only.")
                         .font(.footnote)
                         .foregroundColor(.secondary)
                 }

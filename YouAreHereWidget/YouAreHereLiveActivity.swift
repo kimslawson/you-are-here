@@ -13,12 +13,15 @@ struct YouAreHereLiveActivity: Widget {
             // widget process, which can't read the app's UserDefaults).
             let _ = Theme.apply(from: context.state)
             // Lock Screen / banner presentation.
-            WayfindingView(state: context.state, townSize: 40, alignment: .leading,
-                           speedSignScale: 2) {
-                pauseControl(isPaused: context.state.isPaused, size: 22)
-            }
+            ZStack {
+                activityBackdrop(context.state)
+                WayfindingView(state: context.state, townSize: 40, alignment: .leading,
+                               speedSignScale: 2) {
+                    pauseControl(isPaused: context.state.isPaused, size: 22)
+                }
                 .padding(.horizontal, 18)
                 .padding(.vertical, 14)
+            }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Theme.background)
                 .activityBackgroundTint(Theme.background)
@@ -93,6 +96,30 @@ struct YouAreHereLiveActivity: Widget {
             }
             .widgetURL(URL(string: "youarehere://open"))
             .keylineTint(Theme.primary)
+        }
+    }
+
+    /// The aesthetic backdrop, rendered statically — it refreshes whenever the
+    /// activity's content does (~1/s while driving). Only the procedural ones:
+    /// streets geometry can't fit in the activity's state budget, and neon is
+    /// dark-mode only.
+    @ViewBuilder
+    private func activityBackdrop(_ s: LocationActivityAttributes.ContentState) -> some View {
+        let art = BackgroundArt(rawValue: s.backgroundID)
+        if art == .topo || (art == .neon && !s.lightMode) {
+            Canvas { ctx, size in
+                switch art {
+                case .topo:
+                    let path = BackgroundArtRenderer.topoContours(size: size)
+                    BackgroundArtRenderer.drawTopo(&ctx, size: size, path: path, date: Date())
+                case .neon:
+                    BackgroundArtRenderer.drawNeon(
+                        &ctx, size: size,
+                        phase: BackgroundArtRenderer.neonAutoPhase(at: Date()))
+                default:
+                    break
+                }
+            }
         }
     }
 

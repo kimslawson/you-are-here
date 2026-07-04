@@ -219,6 +219,7 @@ struct PiPFrameView: View {
     var body: some View {
         ZStack {
             Theme.background
+            backdrop
             // Small trades a bit of town size for bigger secondary lines —
             // at strip size the small type is what goes illegible first.
             WayfindingView(state: state, townSize: large ? 84 : 50,
@@ -228,6 +229,33 @@ struct PiPFrameView: View {
                 .padding(.vertical, large ? 18 : 14)
         }
         .frame(width: 480, height: large ? 240 : 160)
+    }
+
+    /// The aesthetic backdrop, static per frame (frames regenerate ~1/s while
+    /// driving, which animates it gently). Rendered in the app process, so
+    /// streets can use the shared fetch model.
+    @ViewBuilder
+    private var backdrop: some View {
+        let art = BackgroundArt(rawValue: state.backgroundID)
+        if art == .streets || art == .topo || (art == .neon && !state.lightMode) {
+            Canvas { ctx, size in
+                switch art {
+                case .streets:
+                    BackgroundArtRenderer.drawStreets(
+                        &ctx, size: size, roads: StreetMapModel.shared.roads,
+                        angle: BackgroundArtRenderer.streetsAutoAngle(at: Date()))
+                case .topo:
+                    let path = BackgroundArtRenderer.topoContours(size: size)
+                    BackgroundArtRenderer.drawTopo(&ctx, size: size, path: path, date: Date())
+                case .neon:
+                    BackgroundArtRenderer.drawNeon(
+                        &ctx, size: size,
+                        phase: BackgroundArtRenderer.neonAutoPhase(at: Date()))
+                default:
+                    break
+                }
+            }
+        }
     }
 }
 

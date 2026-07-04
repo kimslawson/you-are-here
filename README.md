@@ -67,8 +67,13 @@ When the **town, road, or compass direction changes**, that field briefly
   stored as hex; default is white — black in light mode). Both travel to the
   widget inside `ContentState`, like the font and units.
 - **Backgrounds (opt-in, purely aesthetic):** *Settings ▸ Appearance ▸
-  Background.* Barely-there backdrops behind the readout, inspired by idle
-  car-nav displays (see `BackgroundArt.swift`):
+  Background.* Dim backdrops behind the readout, inspired by idle car-nav
+  displays. Drawing lives in `Shared/BackgroundArtRenderer.swift` (pure
+  functions) so all surfaces share it: animated in the app, static-per-frame
+  in PiP (~1/s) and the Live Activity (per content update; the choice rides
+  in `ContentState.backgroundID`). Streets is app + PiP only — road geometry
+  can't fit ActivityKit's ~4KB state budget. Hosts/fetching in
+  `YouAreHere/BackgroundArt.swift`:
   - **Streets** — nearby roads as faint strokes on a perspective-tilted plane,
     rotating once per 25 minutes, fading toward the horizon. Deliberately too
     abstract to navigate by. Fetches geometry from Overpass sparsely (first

@@ -21,6 +21,7 @@ final class LocationEngine: NSObject, ObservableObject {
         headingContinuous: nil,
         unitIsMetric: false, fontID: AppFont.helvetica.rawValue,
         lightMode: false, flashHex: nil,
+        backgroundID: BackgroundArt.off.rawValue,
         hasSignal: true, isPaused: false, speedLimitKmh: nil,
         townChanged: false, roadChanged: false, headingChanged: false, speedLimitChanged: false)
     @Published private(set) var authorization: CLAuthorizationStatus = .notDetermined
@@ -112,6 +113,7 @@ final class LocationEngine: NSObject, ObservableObject {
         state.fontID = appearance.fontID
         state.lightMode = appearance.light
         state.flashHex = appearance.flashHex
+        state.backgroundID = appearance.backgroundID
         applyRefreshConfiguration()   // sets accuracy + distance/heading filters
         updateHeadingOrientation()
 
@@ -264,13 +266,16 @@ final class LocationEngine: NSObject, ObservableObject {
 
     /// Read the appearance settings, apply them to this process's Theme, and
     /// return the values to carry in ContentState (for the widget process).
-    private func refreshAppearance() -> (fontID: String, light: Bool, flashHex: String?) {
+    private func refreshAppearance() -> (fontID: String, light: Bool, flashHex: String?,
+                                         backgroundID: String) {
         let defaults = UserDefaults.standard
         let light = defaults.bool(forKey: SettingsKey.lightMode)
         let flashHex = defaults.bool(forKey: SettingsKey.customFlashColor)
             ? defaults.string(forKey: SettingsKey.flashColorHex) : nil
         Theme.apply(light: light, flashHex: flashHex)
-        return (AppFont.current().rawValue, light, flashHex)
+        let background = defaults.string(forKey: SettingsKey.backgroundArt)
+            ?? BackgroundArt.off.rawValue
+        return (AppFont.current().rawValue, light, flashHex, background)
     }
 
     private func suspendSensors() {
@@ -357,6 +362,7 @@ final class LocationEngine: NSObject, ObservableObject {
             headingContinuous: continuousHeading,
             unitIsMetric: metric, fontID: appearance.fontID,
             lightMode: appearance.light, flashHex: appearance.flashHex,
+            backgroundID: appearance.backgroundID,
             hasSignal: networkAvailable, isPaused: false,
             speedLimitKmh: speedKmh,
             townChanged: townChanged, roadChanged: roadChanged, headingChanged: headingChanged,
@@ -395,6 +401,7 @@ final class LocationEngine: NSObject, ObservableObject {
         s.fontID = appearance.fontID
         s.lightMode = appearance.light
         s.flashHex = appearance.flashHex
+        s.backgroundID = appearance.backgroundID
         s.townChanged = false
         s.roadChanged = false
         s.headingChanged = false
