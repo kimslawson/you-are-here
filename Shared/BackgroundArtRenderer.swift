@@ -9,8 +9,12 @@ enum BackgroundArt: String, CaseIterable, Identifiable {
     /// App + PiP only: road geometry can't ride in the Live Activity's state
     /// (ActivityKit budgets content to ~4KB) and widgets can't fetch.
     case streets
-    /// Slowly drifting topographic contour lines, generated on-device.
+    /// Real topographic contours around you, from fetched elevation data
+    /// (Open-Meteo), drawn 2-D top-down. App + PiP only (needs the fetch).
     case topo
+    /// On-device fractal-noise contours — the offline/flat-terrain fallback for
+    /// `topo`. Self-contained, so it renders on every surface.
+    case procedural
     /// Dim synthwave grid whose scroll speed follows GPS speed (in the app;
     /// elsewhere it rolls at a steady idle). Dark mode only.
     case neon
@@ -50,6 +54,22 @@ enum BackgroundArtRenderer {
         ctx.translateBy(x: -topoMargin + sin(t / 97) * 32,
                         y: -topoMargin + cos(t / 131) * 32)
         ctx.stroke(path, with: .color(Theme.secondary.opacity(min(1, 0.30 * contrast))), lineWidth: 1.2)
+    }
+
+    /// Draw a pre-traced *real* elevation contour path (built in a `traceSize`
+    /// square, north-up) top-down: scaled to overfill the canvas, centered, with
+    /// the same gentle drift and line spec as the procedural topo. The line
+    /// width is divided by the scale so it lands ~1.2pt on screen.
+    static func drawTopoContours(_ ctx: inout GraphicsContext, size: CGSize, path: Path,
+                                 traceSize: CGFloat, date: Date, contrast: Double) {
+        let scale = max(size.width, size.height) / traceSize * 1.15
+        let t = date.timeIntervalSinceReferenceDate
+        ctx.translateBy(x: size.width / 2 + sin(t / 97) * 20,
+                        y: size.height / 2 + cos(t / 131) * 20)
+        ctx.scaleBy(x: scale, y: scale)
+        ctx.translateBy(x: -traceSize / 2, y: -traceSize / 2)
+        ctx.stroke(path, with: .color(Theme.secondary.opacity(min(1, 0.30 * contrast))),
+                   lineWidth: 1.2 / scale)
     }
 
     // MARK: Streets
@@ -234,19 +254,31 @@ struct TopoField {
         return value
     }
 
-    /// Marching squares over a coarse grid, several ISO levels.
+    /// Procedural contours: marching squares over the fBm height field.
     func contours(size: CGSize, cell: CGFloat = 8) -> Path {
-        let cols = Int(size.width / cell) + 1
-        let rows = Int(size.height / cell) + 1
+        ContourTracer.path(width: size.width, height: size.height, cell: cell,
+                           levels: Array(stride(from: 0.32, through: 0.68, by: 0.06)),
+                           sample: { self.height($0, $1) })
+    }
+}
+
+/// Marching squares over an arbitrary sampled height field — shared by the
+/// procedural topo (fBm sample) and the real topo (bilinear over fetched
+/// elevation). Traces one polyline segment per crossing at each ISO level.
+enum ContourTracer {
+    static func path(width: CGFloat, height: CGFloat, cell: CGFloat,
+                     levels: [Double], sample: (Double, Double) -> Double) -> Path {
+        let cols = Int(width / cell) + 1
+        let rows = Int(height / cell) + 1
         var field = [Double](repeating: 0, count: (cols + 1) * (rows + 1))
         for j in 0...rows {
             for i in 0...cols {
-                field[j * (cols + 1) + i] = height(Double(i) * cell, Double(j) * cell)
+                field[j * (cols + 1) + i] = sample(Double(i) * Double(cell), Double(j) * Double(cell))
             }
         }
 
         var path = Path()
-        for level in stride(from: 0.32, through: 0.68, by: 0.06) {
+        for level in levels {
             for j in 0..<rows {
                 for i in 0..<cols {
                     let tl = field[j * (cols + 1) + i]

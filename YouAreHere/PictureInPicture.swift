@@ -237,7 +237,8 @@ struct PiPFrameView: View {
     @ViewBuilder
     private var backdrop: some View {
         let art = BackgroundArt(rawValue: state.backgroundID)
-        if art == .streets || art == .topo || (art == .neon && !state.lightMode) {
+        if art == .streets || art == .topo || art == .procedural
+            || (art == .neon && !state.lightMode) {
             Canvas { ctx, size in
                 switch art {
                 case .streets:
@@ -246,6 +247,13 @@ struct PiPFrameView: View {
                         angle: BackgroundArtRenderer.streetsAutoAngle(at: Date()),
                         contrast: state.backgroundContrast)
                 case .topo:
+                    if let path = ElevationModel.shared.contourPath {
+                        BackgroundArtRenderer.drawTopoContours(
+                            &ctx, size: size, path: path,
+                            traceSize: ElevationModel.traceSize,
+                            date: Date(), contrast: state.backgroundContrast)
+                    }
+                case .procedural:
                     let path = BackgroundArtRenderer.topoContours(size: size)
                     BackgroundArtRenderer.drawTopo(&ctx, size: size, path: path, date: Date(),
                                                    contrast: state.backgroundContrast)

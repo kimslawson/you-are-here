@@ -235,9 +235,10 @@ struct SettingsView: View {
                         Text("Off").tag(BackgroundArt.off.rawValue)
                         Text("Streets").tag(BackgroundArt.streets.rawValue)
                         Text("Topo").tag(BackgroundArt.topo.rawValue)
+                        Text("Procedural").tag(BackgroundArt.procedural.rawValue)
                         Text("Neon").tag(BackgroundArt.neon.rawValue)
                     }
-                    .pickerStyle(.segmented)
+                    .pickerStyle(.menu)
                     .onChange(of: backgroundArt) { _ in engine.reloadAppearance() }
                     if backgroundArt != BackgroundArt.off.rawValue {
                         HStack {
@@ -249,7 +250,7 @@ struct SettingsView: View {
                             }
                         }
                     }
-                    Text("Purely aesthetic, dim backdrops behind the readout — also on the Live Activity and floating window (updating with the readout, about once a second). Streets sketches a tilted, slowly turning abstract of nearby roads — deliberately useless for navigation (fetches geometry from OpenStreetMap; sends your location to overpass-api.de, like route lookup; app and floating window only). Topo draws slowly drifting contour lines generated on-device — no network, not real terrain. Neon is a synthwave grid that scrolls at your actual driving speed; dark mode only.")
+                    Text("Purely aesthetic, dim backdrops behind the readout — also on the Live Activity and floating window (updating with the readout, about once a second). Streets sketches a tilted, slowly turning abstract of nearby roads. Topo draws real elevation contours around you, top-down. Both fetch from a third-party server (overpass-api.de / open-meteo.com), send your location, and appear in the app and floating window only — not the Live Activity. Procedural is Topo's offline twin: contour lines from on-device noise, no network, not real terrain (and the better pick in flat areas). Neon is a synthwave grid that scrolls at your actual driving speed; dark mode only.")
                         .font(.footnote)
                         .foregroundColor(.secondary)
                 }

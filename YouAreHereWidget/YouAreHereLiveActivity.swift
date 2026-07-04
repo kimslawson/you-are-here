@@ -100,16 +100,17 @@ struct YouAreHereLiveActivity: Widget {
     }
 
     /// The aesthetic backdrop, rendered statically — it refreshes whenever the
-    /// activity's content does (~1/s while driving). Only the procedural ones:
-    /// streets geometry can't fit in the activity's state budget, and neon is
-    /// dark-mode only.
+    /// activity's content does (~1/s while driving). Only the self-contained
+    /// ones: streets and real topo need a fetch the widget process can't do
+    /// (and their geometry wouldn't fit the activity's state budget), and neon
+    /// is dark-mode only.
     @ViewBuilder
     private func activityBackdrop(_ s: LocationActivityAttributes.ContentState) -> some View {
         let art = BackgroundArt(rawValue: s.backgroundID)
-        if art == .topo || (art == .neon && !s.lightMode) {
+        if art == .procedural || (art == .neon && !s.lightMode) {
             Canvas { ctx, size in
                 switch art {
-                case .topo:
+                case .procedural:
                     let path = BackgroundArtRenderer.topoContours(size: size)
                     BackgroundArtRenderer.drawTopo(&ctx, size: size, path: path, date: Date(),
                                                    contrast: s.backgroundContrast)

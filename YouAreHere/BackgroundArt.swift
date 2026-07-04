@@ -11,10 +11,11 @@ struct BackgroundArtView: View {
 
     var body: some View {
         switch kind {
-        case .off:     EmptyView()
-        case .streets: StreetsBackground()
-        case .topo:    TopoBackground()
-        case .neon:    NeonBackground()
+        case .off:        EmptyView()
+        case .streets:    StreetsBackground()
+        case .topo:       TopoBackground()
+        case .procedural: ProceduralBackground()
+        case .neon:       NeonBackground()
         }
     }
 }
@@ -140,7 +141,135 @@ struct StreetsBackground: View {
     }
 }
 
-// MARK: - Topo (procedural contour lines)
+// MARK: - Topo (real elevation contours, fetched)
+
+/// Fetches a coarse elevation grid around the coordinate from Open-Meteo (no
+/// key, free), runs marching squares over a bilinear interpolation of it, and
+/// publishes a top-down, north-up contour `Path` traced in a fixed
+/// `traceSize` square. Sparse fetches, like the street map. Shared singleton so
+/// the PiP frame renderer can draw the same contours.
+@MainActor
+final class ElevationModel: ObservableObject {
+    static let shared = ElevationModel()
+    /// Side of the square the contours are traced into (points); the renderer
+    /// scales this to the screen.
+    static let traceSize: CGFloat = 240
+
+    @Published private(set) var contourPath: Path?
+
+    private var center: CLLocationCoordinate2D?
+    private var lastFetch = Date.distantPast
+    private var inFlight = false
+    private let gridN = 10            // 10×10 = 100 points — one Open-Meteo call
+    private let spanMeters = 3000.0   // ~3 km square around you
+
+    func update(for coordinate: CLLocationCoordinate2D) {
+        guard !inFlight else { return }
+        let movedEnough = center.map {
+            CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+                .distance(from: CLLocation(latitude: $0.latitude, longitude: $0.longitude)) > 500
+        } ?? true
+        guard movedEnough,
+              Date().timeIntervalSince(lastFetch) > (center == nil ? 20 : 120) else { return }
+
+        inFlight = true
+        lastFetch = Date()
+        Task { [weak self] in
+            guard let self else { return }
+            defer { Task { @MainActor in self.inFlight = false } }
+            guard let grid = await Self.fetchGrid(around: coordinate,
+                                                  n: self.gridN, span: self.spanMeters) else { return }
+            let path = Self.buildContours(grid: grid, n: self.gridN)
+            await MainActor.run {
+                self.center = coordinate
+                self.contourPath = path
+            }
+        }
+    }
+
+    /// GET a row-major N×N elevation grid (north-up: row 0 is the northmost).
+    private static func fetchGrid(around c: CLLocationCoordinate2D,
+                                  n: Int, span: Double) async -> [Double]? {
+        let mPerLat = 111_320.0
+        let mPerLon = mPerLat * cos(c.latitude * .pi / 180)
+        var lats = [String](), lons = [String]()
+        for j in 0..<n {
+            for i in 0..<n {
+                let fx = Double(i) / Double(n - 1) - 0.5   // west→east
+                let fy = Double(j) / Double(n - 1) - 0.5   // north→south (row 0 = north)
+                let lat = c.latitude - fy * span / mPerLat
+                let lon = c.longitude + fx * span / mPerLon
+                lats.append(String(format: "%.5f", lat))
+                lons.append(String(format: "%.5f", lon))
+            }
+        }
+        var comp = URLComponents(string: "https://api.open-meteo.com/v1/elevation")!
+        comp.queryItems = [
+            URLQueryItem(name: "latitude", value: lats.joined(separator: ",")),
+            URLQueryItem(name: "longitude", value: lons.joined(separator: ",")),
+        ]
+        guard let url = comp.url else { return nil }
+        var req = URLRequest(url: url)
+        req.setValue("YouAreHere/1.0 (iOS wayfinding app)", forHTTPHeaderField: "User-Agent")
+        req.timeoutInterval = 15
+        guard let (data, response) = try? await URLSession.shared.data(for: req),
+              (response as? HTTPURLResponse)?.statusCode == 200,
+              let decoded = try? JSONDecoder().decode(ElevationResponse.self, from: data),
+              decoded.elevation.count == n * n else { return nil }
+        return decoded.elevation
+    }
+
+    /// Marching squares over a bilinear interpolation of the fetched grid, at
+    /// ~8 evenly spaced ISO levels between the grid's min and max elevation.
+    /// Flat areas (little relief) trace nothing — by design.
+    private static func buildContours(grid: [Double], n: Int) -> Path {
+        guard grid.count == n * n, let minE = grid.min(), let maxE = grid.max(),
+              maxE - minE > 3 else { return Path() }   // < 3 m relief: too flat
+        let ts = Double(traceSize)
+        func sample(_ x: Double, _ y: Double) -> Double {
+            let gx = min(Double(n - 1), max(0, x / ts * Double(n - 1)))
+            let gy = min(Double(n - 1), max(0, y / ts * Double(n - 1)))
+            let x0 = Int(gx), y0 = Int(gy)
+            let x1 = min(n - 1, x0 + 1), y1 = min(n - 1, y0 + 1)
+            let fx = gx - Double(x0), fy = gy - Double(y0)
+            let a = grid[y0 * n + x0], b = grid[y0 * n + x1]
+            let c = grid[y1 * n + x0], d = grid[y1 * n + x1]
+            return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy
+        }
+        let levels = (1...8).map { minE + (maxE - minE) * Double($0) / 9.0 }
+        return ContourTracer.path(width: traceSize, height: traceSize, cell: 4,
+                                  levels: levels, sample: sample)
+    }
+
+    private struct ElevationResponse: Decodable { let elevation: [Double] }
+}
+
+/// Real topographic contours around you, drawn 2-D top-down (north-up).
+struct TopoBackground: View {
+    @EnvironmentObject private var engine: LocationEngine
+    @ObservedObject private var model = ElevationModel.shared
+    @AppStorage(SettingsKey.backgroundContrast) private var contrast = 1.0
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 0.5)) { timeline in
+            Canvas { ctx, size in
+                if let path = model.contourPath {
+                    BackgroundArtRenderer.drawTopoContours(
+                        &ctx, size: size, path: path,
+                        traceSize: ElevationModel.traceSize,
+                        date: timeline.date, contrast: contrast)
+                }
+            }
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+        .onReceive(engine.$lastCoordinate.compactMap { $0 }) { coordinate in
+            model.update(for: coordinate)
+        }
+    }
+}
+
+// MARK: - Procedural (on-device fractal-noise contours)
 
 /// Reference-type cache mutated inside the Canvas draw closure: the path is
 /// built lazily on the first draw with the canvas's *actual* size, which
@@ -150,7 +279,7 @@ private final class TopoCache {
     var path = Path()
 }
 
-struct TopoBackground: View {
+struct ProceduralBackground: View {
     @State private var cache = TopoCache()
     @AppStorage(SettingsKey.backgroundContrast) private var contrast = 1.0
 
@@ -202,9 +331,11 @@ struct NeonBackground: View {
     }
 }
 
-#Preview("Topo") {
+// Procedural has no data dependency, so it's the previewable one; real Topo
+// needs a fetch + the engine's coordinate.
+#Preview("Procedural") {
     ZStack {
         Theme.background.ignoresSafeArea()
-        TopoBackground()
+        ProceduralBackground()
     }
 }

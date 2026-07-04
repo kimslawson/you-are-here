@@ -81,15 +81,24 @@ When the **town, road, or compass direction changes**, that field briefly
     abstract to navigate by. Fetches geometry from Overpass sparsely (first
     fix, then only after ~400m of movement, ≥2min apart) — sends your location
     to `overpass-api.de`, same caveat as route lookup.
-  - **Topo** — contour lines over on-device fractal noise (marching squares),
-    drifting on a ±32pt Lissajous path with ~10-minute periods: always moving,
-    never noticeably. No network, no data source, not real terrain — that's
-    the point.
-  - **Neon** — a dim outrun/synthwave grid (perspective rows, striped sun)
-    whose scroll rate follows your actual GPS speed (low-passed, plus a slow
-    idle crawl at rest; ~65 mph ≈ 2.4 rows/s). Loops seamlessly by
-    construction — the scene is periodic per grid row. Dark mode only: dim
-    glow has nothing to glow against on white.
+  - **Topo** — *real* elevation contours around you, drawn 2-D top-down
+    (north-up). Fetches a 10×10 elevation grid (~3 km square) from Open-Meteo
+    (`open-meteo.com`, no key), bilinear-interpolates it, and marching-squares
+    ~8 ISO levels between the grid's min/max. Sends your location; sparse
+    fetches (>500 m movement, ≥2 min apart). App + PiP only (needs the fetch).
+    Flat/coastal areas trace little or nothing — that's honest, and why
+    Procedural exists. `ElevationModel` in `BackgroundArt.swift`.
+  - **Procedural** — Topo's offline twin: the same contour renderer over
+    on-device fractal noise (marching squares) instead of real elevation.
+    Drifts on a ±32 pt Lissajous path; no network, not real terrain — the
+    better pick in flat areas, and the only contour option on the Live
+    Activity (no fetch there). The shared tracer is `ContourTracer`.
+  - **Neon** — a dim outrun/synthwave grid: a procedural cyan city skyline on
+    the horizon, magenta perspective rows (portrait doubles their frequency and
+    runs them up to the horizon), and a striped round sun. Scroll rate follows
+    your actual GPS speed (low-passed, plus a slow idle crawl; ~65 mph ≈ 2.4
+    rows/s). Loops seamlessly — the scene is periodic per grid row. Dark mode
+    only: dim glow has nothing to glow against on white.
 - **Easter egg:** tap the app screen 10 times in quick succession and the whole
   UI switches to Comic Sans (well, Comic Neue — iOS doesn't ship the real
   thing). Ten more taps restore whatever font you had before.
@@ -321,12 +330,14 @@ Shared/                         Compiled into BOTH app and widget
   RouteShield                   Highway shields drawn in SwiftUI (no assets)
   RouteParser                   Heuristic route-number extraction
   Formatting                    Units, cardinal direction, route labels
+  BackgroundArtRenderer         Aesthetic-backdrop drawing + ContourTracer
 YouAreHere/                     App target
   YouAreHereApp / ContentView   Full-screen UI + settings
   LocationEngine                CoreLocation + heading + altitude + Live Activity
   PlaceProvider                 Geocoding abstraction (Apple online today)
   AltitudeFuser                 GPS + barometer fusion
   Settings                      UserDefaults keys
+  BackgroundArt                 Backdrop hosts + Overpass/Open-Meteo fetch
   MetricsLogger                 MetricKit perf logging (METRICS_LOGGING flag)
   AppShortcuts                  Siri phrases / Shortcuts action (fast launch)
 YouAreHereWidget/               Widget extension target
