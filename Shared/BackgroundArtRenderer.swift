@@ -91,6 +91,7 @@ enum BackgroundArtRenderer {
         let gridHeight = h - horizonY
         let magenta = Color(red: 1.0, green: 0.25, blue: 0.75)
         let cyan = Color(red: 0.3, green: 0.9, blue: 1.0)
+        let portrait = h > w
 
         // Sun: gradient disc with widening scanline gaps, on the horizon.
         let sunRadius = min(w, h) * 0.17
@@ -104,32 +105,42 @@ enum BackgroundArtRenderer {
                                   magenta.opacity(min(1, 0.32 * contrast))]),
                 startPoint: CGPoint(x: sunCenter.x, y: sunCenter.y - sunRadius),
                 endPoint: CGPoint(x: sunCenter.x, y: sunCenter.y + sunRadius)))
+            // Cut lines: start at the equator, thickness and gap growing
+            // together toward the bottom for the classic round outrun falloff.
+            // More, thinner stripes than a fixed step gives the rounder feel.
             layer.blendMode = .clear
-            var gapY = sunCenter.y + sunRadius * 0.05
-            var gap: CGFloat = 2
-            while gapY < sunCenter.y + sunRadius {
-                layer.fill(Path(CGRect(x: sunCenter.x - sunRadius, y: gapY,
-                                       width: sunRadius * 2, height: gap)),
+            var stripeY = sunCenter.y + sunRadius * 0.03
+            var thickness = sunRadius * 0.02
+            var gap = sunRadius * 0.04
+            while stripeY < sunCenter.y + sunRadius {
+                layer.fill(Path(CGRect(x: sunCenter.x - sunRadius, y: stripeY,
+                                       width: sunRadius * 2, height: thickness)),
                            with: .color(.black))
-                gapY += gap + sunRadius * 0.12
-                gap += 1.5
+                stripeY += thickness + gap
+                thickness *= 1.2
+                gap *= 1.2
             }
         }
 
-        // Horizon glow line.
-        var horizon = Path()
-        horizon.move(to: CGPoint(x: 0, y: horizonY))
-        horizon.addLine(to: CGPoint(x: w, y: horizonY))
-        ctx.stroke(horizon, with: .color(cyan.opacity(min(1, 0.32 * contrast))), lineWidth: 1)
+        // Cyan procedural city skyline sitting on the horizon (stable frame to
+        // frame — deterministic per building index).
+        drawSkyline(&ctx, width: w, horizonY: horizonY, unit: min(w, h),
+                    color: cyan, contrast: contrast)
 
-        // Rows: equally spaced in world depth, projected as 1/depth. As phase
-        // rises each row slides toward the viewer; at depth < 1 it exits past
-        // the bottom edge just as the next row arrives — the seamless loop.
-        for k in 1...24 {
-            let depth = Double(k) - phase
+        // Rows spaced in world depth, projected as 1/depth, sliding toward the
+        // viewer as phase rises (seamless: the pattern repeats every `step`, and
+        // phase wraps at 1). Portrait doubles the frequency; both run dense
+        // enough near the top to meet the skyline instead of leaving a gap.
+        let step = portrait ? 0.5 : 1.0
+        let horizonGap = max(4, gridHeight * 0.012)
+        var n = 1
+        while n <= 400 {
+            let depth = step * (Double(n) - phase)
+            n += 1
             guard depth > 0.05 else { continue }
             let y = horizonY + gridHeight / CGFloat(depth)
-            guard y <= h + 2 else { continue }
+            if y > h + 2 { continue }              // still below the screen
+            if y < horizonY + horizonGap { break } // reached the horizon
             var line = Path()
             line.move(to: CGPoint(x: 0, y: y))
             line.addLine(to: CGPoint(x: w, y: y))
@@ -145,6 +156,46 @@ enum BackgroundArtRenderer {
             fan.addLine(to: CGPoint(x: w * 0.5 + CGFloat(i) * bottomSpacing, y: h))
         }
         ctx.stroke(fan, with: .color(magenta.opacity(min(1, 0.22 * contrast))), lineWidth: 1)
+    }
+
+    /// A dim cyan city silhouette on the horizon: filled blocks with brighter
+    /// top edges and the occasional antenna. Heights/widths come from a
+    /// deterministic hash of the building index, so the skyline is fixed rather
+    /// than flickering every frame. A faint baseline grounds it on the horizon.
+    private static func drawSkyline(_ ctx: inout GraphicsContext, width: CGFloat,
+                                    horizonY: CGFloat, unit: CGFloat,
+                                    color: Color, contrast: Double) {
+        func rand(_ i: Int, _ salt: Int) -> CGFloat {
+            var h = UInt64(bitPattern: Int64(i &* 73856093 ^ salt &* 19349663))
+            h = (h ^ (h >> 33)) &* 0xff51afd7ed558ccd
+            h ^= h >> 33
+            return CGFloat(h & 0xFFFF) / CGFloat(0xFFFF)
+        }
+        var blocks = Path()
+        var tops = Path()
+        let maxHeight = unit * 0.14
+        var x = -unit * 0.1
+        var i = 0
+        while x < width + unit * 0.1 {
+            let bw = unit * (0.05 + rand(i, 1) * 0.06)
+            let bh = maxHeight * (0.22 + rand(i, 2) * 0.78)
+            let rect = CGRect(x: x, y: horizonY - bh, width: bw * 0.9, height: bh)
+            blocks.addRect(rect)
+            tops.move(to: CGPoint(x: rect.minX, y: rect.minY))
+            tops.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+            if rand(i, 3) > 0.82 {   // occasional antenna
+                tops.move(to: CGPoint(x: rect.midX, y: rect.minY))
+                tops.addLine(to: CGPoint(x: rect.midX, y: rect.minY - maxHeight * 0.4))
+            }
+            x += bw
+            i += 1
+        }
+        ctx.fill(blocks, with: .color(color.opacity(min(1, 0.20 * contrast))))
+        ctx.stroke(tops, with: .color(color.opacity(min(1, 0.55 * contrast))), lineWidth: 1)
+        var baseline = Path()
+        baseline.move(to: CGPoint(x: 0, y: horizonY))
+        baseline.addLine(to: CGPoint(x: width, y: horizonY))
+        ctx.stroke(baseline, with: .color(color.opacity(min(1, 0.28 * contrast))), lineWidth: 1)
     }
 }
 
