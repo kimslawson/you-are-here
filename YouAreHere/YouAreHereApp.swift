@@ -10,6 +10,12 @@ struct YouAreHereApp: App {
         // Activity pause-bus closure — even when iOS cold-launches us in the
         // background solely to run the pause/resume intent.
         _ = LocationEngine.shared
+
+        #if METRICS_LOGGING
+        // Register the MetricKit subscriber early so it's live before iOS
+        // delivers any pending daily payload (see README ▸ Debugging).
+        MetricsLogger.shared.start()
+        #endif
     }
 
     var body: some Scene {

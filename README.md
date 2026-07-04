@@ -246,6 +246,48 @@ Then in Xcode:
 **Requirements:** iOS 16.2+, Xcode 15+, a device with a barometer (all modern
 iPhones), and a paid Apple Developer account for on-device Live Activities.
 
+## Debugging
+
+### On-device performance logging (MetricKit)
+
+Live Instruments recording (CPU / memory / energy) is **tethered** — USB or
+wireless debugging on the same local network — and does *not* buffer on device
+to sync later. For a **real drive**, `MetricsLogger.swift` uses **MetricKit**
+instead: iOS aggregates CPU, GPU, memory, run-time (foreground / background /
+background-audio for PiP / background-location) and — most usefully here — time
+spent at each **GPS accuracy level** (the battery lever the update-rate setting
+pulls), then delivers it to the app.
+
+**Where it "delivers":** MetricKit calls the registered subscriber's
+`didReceive(_:)` — an **in-process callback inside your app**, not a server or a
+dropped file — at most once per ~24h, on a *later* launch. So you drive today
+and read it tomorrow. `MetricsLogger` handles that callback two ways:
+
+- **Console:** each payload is `NSLog`-ged. Relaunch the app the next day with
+  it attached to Xcode (or open **Console.app**, select the device) and filter
+  for `[Metrics]`. It also dumps `MXMetricManager.shared.pastPayloads` on launch,
+  so you can read already-delivered data without waiting for a fresh one.
+- **JSON backup:** the raw payload is written to the app's Documents container as
+  `metric-<timestamp>.json`. Pull it via **Xcode ▸ Window ▸ Devices and
+  Simulators ▸ (your app) ▸ ⚙︎ ▸ Download Container**, then right-click ▸ Show
+  Package Contents ▸ `AppData/Documents/`.
+
+**Turning it on/off.** It's gated behind the **`METRICS_LOGGING`** Swift compile
+flag, currently **enabled in Debug builds only** (so it is never in a Release or
+App Store build). The whole file compiles out when the flag is absent.
+
+- **On** (the default for the Debug builds you install to drive with): nothing to
+  do — build & run to your device.
+- **Off:** in `project.yml`, remove `METRICS_LOGGING` from the app target's
+  `Debug ▸ SWIFT_ACTIVE_COMPILATION_CONDITIONS` (leave `DEBUG`), then rerun
+  `xcodegen generate`.
+
+MetricKit aggregates at the app level (it won't isolate the widget process) and
+is delivered next-day — for real-time, per-process numbers (app vs.
+`YouAreHereWidgetExtension` vs. `locationd`) use Instruments over USB with a GPX
+route, or the built-in Activity Monitor + Time Profiler + Allocations
+instruments.
+
 ## Project layout
 
 ```
@@ -263,6 +305,7 @@ YouAreHere/                     App target
   PlaceProvider                 Geocoding abstraction (Apple online today)
   AltitudeFuser                 GPS + barometer fusion
   Settings                      UserDefaults keys
+  MetricsLogger                 MetricKit perf logging (METRICS_LOGGING flag)
 YouAreHereWidget/               Widget extension target
   YouAreHereLiveActivity        Lock Screen + Dynamic Island presentations
 design/

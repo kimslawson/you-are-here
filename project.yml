@@ -45,6 +45,13 @@ targets:
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         ENABLE_PREVIEWS: YES
         TARGETED_DEVICE_FAMILY: "1"
+      configs:
+        # METRICS_LOGGING compiles in the on-device MetricKit performance logger
+        # (MetricsLogger.swift) — Debug only, so it's never in a Release/App
+        # Store build. See README ▸ Debugging for how to turn it off. DEBUG is
+        # listed too because overriding this setting drops Xcode's default.
+        Debug:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG METRICS_LOGGING
     dependencies:
       - target: YouAreHereWidgetExtension
 
