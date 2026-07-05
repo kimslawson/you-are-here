@@ -314,7 +314,10 @@ struct NeonBackground: View {
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1.0 / 24)) { timeline in
             Canvas { ctx, size in
-                BackgroundArtRenderer.drawNeon(&ctx, size: size, phase: phase, contrast: contrast)
+                // Continuous heading pans the skyline the short way across north.
+                let heading = engine.state.headingContinuous ?? engine.state.headingDegrees ?? 0
+                BackgroundArtRenderer.drawNeon(&ctx, size: size, phase: phase,
+                                               heading: heading, contrast: contrast)
             }
             .onChange(of: timeline.date) { now in
                 let dt = lastTick.map { min(now.timeIntervalSince($0), 0.5) } ?? 0

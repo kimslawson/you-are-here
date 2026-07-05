@@ -118,6 +118,7 @@ struct YouAreHereLiveActivity: Widget {
                     BackgroundArtRenderer.drawNeon(
                         &ctx, size: size,
                         phase: BackgroundArtRenderer.neonAutoPhase(at: Date()),
+                        heading: s.headingContinuous ?? s.headingDegrees ?? 0,
                         contrast: s.backgroundContrast)
                 default:
                     break
