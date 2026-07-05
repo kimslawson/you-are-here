@@ -4,6 +4,9 @@ import CoreLocation
 /// UserDefaults keys shared between the app UI (via @AppStorage) and the engine.
 enum SettingsKey {
     static let unitIsMetric = "unitIsMetric"
+    static let unitIsCelsius = "unitIsCelsius"
+    static let clock24 = "clock24"
+    static let complications = "complications"
     static let liveActivityEnabled = "liveActivityEnabled"
     static let refreshSeconds = "refreshSeconds"
     static let onlineRouteLookup = "onlineRouteLookup"

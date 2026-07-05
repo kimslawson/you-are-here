@@ -117,31 +117,16 @@ struct WayfindingView<Trailing: View>: View {
             .offset(y: townSize * state.appFont.townOffsetFactor)
     }
 
-    // MARK: Line 3 — altitude + heading
+    // MARK: Line 3 — optional complications (dot-separated) + trailing control.
+    // With none chosen the row is empty but keeps its height (the trailing
+    // control holds it), so the town/road lines above don't move.
     private var metricsLine: some View {
-        HStack(spacing: smallSize * 0.6) {
-            Label {
-                Text(Formatting.altitudeString(meters: state.altitudeMeters, metric: state.unitIsMetric))
-                    .font(state.font(size: smallSize, weight: .medium))
-                    .foregroundColor(Theme.secondary)
-            } icon: {
-                Image(systemName: "mountain.2.fill")
-                    .font(.system(size: smallSize * 0.85))
-                    .foregroundColor(Theme.secondary)
+        let comps = Complication.decode(state.complications)
+        return HStack(spacing: smallSize * 0.6) {
+            ForEach(Array(comps.enumerated()), id: \.offset) { index, comp in
+                if index > 0 { SeparatorDot(size: smallSize) }
+                complication(comp)
             }
-
-            SeparatorDot(size: smallSize)
-
-            Label {
-                Text(Formatting.headingString(state.headingDegrees))
-                    .font(state.font(size: smallSize, weight: .medium))
-                    .foregroundColor(Theme.textColor(changed: state.headingChanged, base: Theme.secondary))
-            } icon: {
-                CompassArrow(degrees: state.headingContinuous,
-                             size: smallSize * 0.85,
-                             color: Theme.textColor(changed: state.headingChanged, base: Theme.secondary))
-            }
-
             if !state.hasSignal {
                 Image(systemName: "wifi.slash")
                     .font(.system(size: smallSize * 0.85))
@@ -152,6 +137,48 @@ struct WayfindingView<Trailing: View>: View {
         }
         .lineLimit(1)
         .minimumScaleFactor(0.6)
+    }
+
+    @ViewBuilder
+    private func complication(_ c: Complication) -> some View {
+        switch c {
+        case .altitude:
+            complicationLabel(
+                Formatting.altitudeString(meters: state.altitudeMeters, metric: state.unitIsMetric),
+                color: Theme.secondary,
+                icon: "mountain.2.fill")
+        case .compass:
+            let color = Theme.textColor(changed: state.headingChanged, base: Theme.secondary)
+            Label {
+                Text(Formatting.headingString(state.headingDegrees))
+                    .font(state.font(size: smallSize, weight: .medium))
+                    .foregroundColor(color)
+            } icon: {
+                CompassArrow(degrees: state.headingContinuous, size: smallSize * 0.85, color: color)
+            }
+        case .time:
+            complicationLabel(
+                Formatting.timeString(Date(), clock24: state.clock24),
+                color: Theme.textColor(changed: state.timeChanged, base: Theme.secondary),
+                icon: "clock")
+        case .temperature:
+            complicationLabel(
+                Formatting.temperatureString(celsius: state.temperatureC, metric: state.unitIsCelsius),
+                color: Theme.textColor(changed: state.temperatureChanged, base: Theme.secondary),
+                icon: "thermometer")
+        }
+    }
+
+    private func complicationLabel(_ text: String, color: Color, icon: String) -> some View {
+        Label {
+            Text(text)
+                .font(state.font(size: smallSize, weight: .medium))
+                .foregroundColor(color)
+        } icon: {
+            Image(systemName: icon)
+                .font(.system(size: smallSize * 0.85))
+                .foregroundColor(color)
+        }
     }
 }
 

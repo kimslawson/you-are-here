@@ -105,7 +105,16 @@ When the **town, road, or compass direction changes**, that field briefly
 - **Settings gear:** always visible in portrait. In landscape it shares the
   top-right corner with the speed-limit sign, so it auto-hides — tap anywhere
   to reveal it for a few seconds.
-- **Units:** Imperial by default, with an in-app Imperial/Metric toggle.
+- **Complications (bottom line):** *Settings ▸ Complications* — pick any subset
+  of **Altitude**, **Compass**, **Time**, **Temperature** (dot-separated, in
+  that order). With none selected the row is empty but keeps its height, so the
+  town/road lines don't move. Time shows the current clock (no seconds) and
+  flashes on the minute; Temperature comes from Open-Meteo (`open-meteo.com`,
+  fetched sparsely with your location) and flashes when it moves more than one
+  display degree. `Complication` in `Shared/`; the choice + values ride to the
+  widget in `ContentState`.
+- **Units:** three independent prefs (*Settings ▸ Units*) — distance
+  Imperial (ft/mi) / Metric (m/km), temperature °F / °C, and clock 12- / 24-hour.
 - **Update rate:** 1s (default) / 2s / 5s / 10s. This isn't just a UI cadence —
   it's a power profile: slower rates also relax GPS accuracy and the
   distance/heading filters so the receiver powers down between fixes (the real
@@ -329,7 +338,8 @@ Shared/                         Compiled into BOTH app and widget
   WayfindingView                The three-line layout (app + lock screen)
   RouteShield                   Highway shields drawn in SwiftUI (no assets)
   RouteParser                   Heuristic route-number extraction
-  Formatting                    Units, cardinal direction, route labels
+  Formatting                    Units, cardinal, route, time, temperature
+  Complication                  Bottom-line complication enum (shared contract)
   BackgroundArtRenderer         Aesthetic-backdrop drawing + ContourTracer
 YouAreHere/                     App target
   YouAreHereApp / ContentView   Full-screen UI + settings

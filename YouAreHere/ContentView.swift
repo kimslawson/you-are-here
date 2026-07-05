@@ -195,6 +195,9 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var engine: LocationEngine
     @AppStorage(SettingsKey.unitIsMetric) private var unitIsMetric = false
+    @AppStorage(SettingsKey.unitIsCelsius) private var unitIsCelsius = false
+    @AppStorage(SettingsKey.clock24) private var clock24 = false
+    @AppStorage(SettingsKey.complications) private var complications = Complication.defaultRaw
     @AppStorage(SettingsKey.refreshSeconds) private var refreshSeconds = 1
     @AppStorage(SettingsKey.onlineRouteLookup) private var onlineRouteLookup = false
     @AppStorage(SettingsKey.showSpeedLimit) private var showSpeedLimit = false
@@ -213,6 +216,18 @@ struct SettingsView: View {
             get: { Color(hex: flashColorHex) ?? .white },
             set: { newValue in
                 flashColorHex = newValue.hexString ?? "FFFFFF"
+                engine.reloadAppearance()
+            })
+    }
+
+    /// On/off binding for one complication, backed by the comma-joined string.
+    private func complicationBinding(_ c: Complication) -> Binding<Bool> {
+        Binding(
+            get: { Complication.decode(complications).contains(c) },
+            set: { on in
+                var set = Set(Complication.decode(complications))
+                if on { set.insert(c) } else { set.remove(c) }
+                complications = Complication.encode(Array(set))
                 engine.reloadAppearance()
             })
     }
@@ -270,12 +285,32 @@ struct SettingsView: View {
                         .font(.footnote)
                         .foregroundColor(.secondary)
                 }
+                Section("Complications") {
+                    ForEach(Complication.allCases) { comp in
+                        Toggle(comp.label, isOn: complicationBinding(comp))
+                    }
+                    Text("Choose what the bottom line shows. With none selected it stays empty (the layout doesn't shift). Time shows the current clock; Temperature is fetched from Open-Meteo (sends your location, like the online lookups).")
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                }
                 Section("Units") {
-                    Picker("Units", selection: $unitIsMetric) {
-                        Text("Imperial (ft)").tag(false)
-                        Text("Metric (m)").tag(true)
+                    Picker("Distance", selection: $unitIsMetric) {
+                        Text("Imperial (ft/mi)").tag(false)
+                        Text("Metric (m/km)").tag(true)
+                    }
+                    .onChange(of: unitIsMetric) { _ in engine.reloadAppearance() }
+                    Picker("Temperature", selection: $unitIsCelsius) {
+                        Text("°F").tag(false)
+                        Text("°C").tag(true)
                     }
                     .pickerStyle(.segmented)
+                    .onChange(of: unitIsCelsius) { _ in engine.reloadAppearance() }
+                    Picker("Clock", selection: $clock24) {
+                        Text("12-hour").tag(false)
+                        Text("24-hour").tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                    .onChange(of: clock24) { _ in engine.reloadAppearance() }
                 }
                 Section("Update rate") {
                     Picker("Refresh", selection: $refreshSeconds) {

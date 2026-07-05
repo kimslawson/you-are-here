@@ -19,12 +19,15 @@ final class LocationEngine: NSObject, ObservableObject {
     @Published private(set) var state = LocationActivityAttributes.ContentState(
         town: "", road: "", route: nil, altitudeMeters: nil, headingDegrees: nil,
         headingContinuous: nil,
-        unitIsMetric: false, fontID: AppFont.helvetica.rawValue,
+        unitIsMetric: false, unitIsCelsius: false, clock24: false,
+        complications: Complication.defaultRaw, temperatureC: nil,
+        fontID: AppFont.helvetica.rawValue,
         lightMode: false, flashHex: nil,
         backgroundID: BackgroundArt.off.rawValue,
         backgroundContrast: 1,
         hasSignal: true, isPaused: false, speedLimitKmh: nil,
-        townChanged: false, roadChanged: false, headingChanged: false, speedLimitChanged: false)
+        townChanged: false, roadChanged: false, headingChanged: false, speedLimitChanged: false,
+        timeChanged: false, temperatureChanged: false)
     @Published private(set) var authorization: CLAuthorizationStatus = .notDetermined
     /// Raw fix for consumers that need geometry, not names (background art).
     @Published private(set) var lastCoordinate: CLLocationCoordinate2D?
@@ -68,6 +71,15 @@ final class LocationEngine: NSObject, ObservableObject {
     /// Last committed speed limit (km/h), for the change-flash.
     private var lastSpeedKmh: Double?
 
+    // MARK: Temperature (Open-Meteo current weather; only while shown)
+    private var temperatureC: Double?
+    private var tempInFlight = false
+    private var lastTempFetch = Date.distantPast
+    private var tempFetchLocation: CLLocation?
+    private let tempRefreshInterval: TimeInterval = 600   // 10 min
+    /// Last committed temperature (°C), for the >1-display-degree flash.
+    private var lastTemperatureC: Double?
+
     // MARK: Tick throttle
     private var tickTimer: Timer?
     private var lastTick = Date.distantPast
@@ -85,6 +97,7 @@ final class LocationEngine: NSObject, ObservableObject {
     private var lastRoad: String?
     private var lastRouteLabel: String?
     private var lastCardinal: String?
+    private var lastMinute: Int?
 
     // MARK: Live Activity
     private var activity: Activity<LocationActivityAttributes>?
@@ -116,6 +129,10 @@ final class LocationEngine: NSObject, ObservableObject {
         state.flashHex = appearance.flashHex
         state.backgroundID = appearance.backgroundID
         state.backgroundContrast = appearance.backgroundContrast
+        state.unitIsMetric = appearance.unitIsMetric
+        state.unitIsCelsius = appearance.unitIsCelsius
+        state.clock24 = appearance.clock24
+        state.complications = appearance.complications
         applyRefreshConfiguration()   // sets accuracy + distance/heading filters
         updateHeadingOrientation()
 
@@ -266,20 +283,38 @@ final class LocationEngine: NSObject, ObservableObject {
         pushFrozenState()
     }
 
-    /// Read the appearance settings, apply them to this process's Theme, and
-    /// return the values to carry in ContentState (for the widget process).
-    private func refreshAppearance() -> (fontID: String, light: Bool, flashHex: String?,
-                                         backgroundID: String, backgroundContrast: Double) {
+    /// All UserDefaults-backed prefs that ride to the widget in ContentState.
+    private struct Prefs {
+        var fontID: String
+        var light: Bool
+        var flashHex: String?
+        var backgroundID: String
+        var backgroundContrast: Double
+        var unitIsMetric: Bool
+        var unitIsCelsius: Bool
+        var clock24: Bool
+        var complications: String
+    }
+
+    /// Read the settings, apply appearance to this process's Theme, and return
+    /// the values to carry in ContentState (for the widget process).
+    private func refreshAppearance() -> Prefs {
         let defaults = UserDefaults.standard
         let light = defaults.bool(forKey: SettingsKey.lightMode)
         let flashHex = defaults.bool(forKey: SettingsKey.customFlashColor)
             ? defaults.string(forKey: SettingsKey.flashColorHex) : nil
         Theme.apply(light: light, flashHex: flashHex)
-        let background = defaults.string(forKey: SettingsKey.backgroundArt)
-            ?? BackgroundArt.off.rawValue
-        let contrast = defaults.object(forKey: SettingsKey.backgroundContrast) == nil
-            ? 1.0 : defaults.double(forKey: SettingsKey.backgroundContrast)
-        return (AppFont.current().rawValue, light, flashHex, background, contrast)
+        return Prefs(
+            fontID: AppFont.current().rawValue,
+            light: light,
+            flashHex: flashHex,
+            backgroundID: defaults.string(forKey: SettingsKey.backgroundArt) ?? BackgroundArt.off.rawValue,
+            backgroundContrast: defaults.object(forKey: SettingsKey.backgroundContrast) == nil
+                ? 1.0 : defaults.double(forKey: SettingsKey.backgroundContrast),
+            unitIsMetric: defaults.bool(forKey: SettingsKey.unitIsMetric),
+            unitIsCelsius: defaults.bool(forKey: SettingsKey.unitIsCelsius),
+            clock24: defaults.bool(forKey: SettingsKey.clock24),
+            complications: defaults.string(forKey: SettingsKey.complications) ?? Complication.defaultRaw)
     }
 
     private func suspendSensors() {
@@ -325,7 +360,11 @@ final class LocationEngine: NSObject, ObservableObject {
 
         maybeGeocode(loc)
 
-        let metric = UserDefaults.standard.unitIsMetric
+        let appearance = refreshAppearance()
+        let complications = Complication.decode(appearance.complications)
+        if complications.contains(.temperature) { maybeFetchTemperature(loc) }
+
+        let metric = appearance.unitIsMetric
         let town = lastPlace?.town ?? ""
         let road = lastPlace?.road ?? ""
         // Online road info (route + speed) applies only while it matches this road.
@@ -358,20 +397,30 @@ final class LocationEngine: NSObject, ObservableObject {
         let roadChanged = lastRoad != nil && (road != lastRoad || routeLabel != lastRouteLabel)
         let headingChanged = lastCardinal != nil && cardinal != nil && cardinal != lastCardinal
         let speedChanged = lastSpeedKmh != nil && speedKmh != nil && speedKmh != lastSpeedKmh
+        // Time: flash on minute rollover. Temperature: flash on >1 display degree.
+        let minute = Calendar.current.component(.minute, from: now)
+        let timeChanged = lastMinute != nil && minute != lastMinute
+        let newTempDisplay = Formatting.temperatureValue(celsius: temperatureC, metric: appearance.unitIsCelsius)
+        let lastTempDisplay = Formatting.temperatureValue(celsius: lastTemperatureC, metric: appearance.unitIsCelsius)
+        let tempChanged = lastTempDisplay != nil && newTempDisplay != nil
+            && abs(newTempDisplay! - lastTempDisplay!) > 1
 
-        let appearance = refreshAppearance()
         let newState = LocationActivityAttributes.ContentState(
             town: town, road: road, route: route,
             altitudeMeters: altitude, headingDegrees: heading,
             headingContinuous: continuousHeading,
-            unitIsMetric: metric, fontID: appearance.fontID,
+            unitIsMetric: metric, unitIsCelsius: appearance.unitIsCelsius,
+            clock24: appearance.clock24, complications: appearance.complications,
+            temperatureC: temperatureC,
+            fontID: appearance.fontID,
             lightMode: appearance.light, flashHex: appearance.flashHex,
             backgroundID: appearance.backgroundID,
             backgroundContrast: appearance.backgroundContrast,
             hasSignal: networkAvailable, isPaused: false,
             speedLimitKmh: speedKmh,
             townChanged: townChanged, roadChanged: roadChanged, headingChanged: headingChanged,
-            speedLimitChanged: speedChanged)
+            speedLimitChanged: speedChanged,
+            timeChanged: timeChanged, temperatureChanged: tempChanged)
 
         state = newState
 
@@ -381,8 +430,11 @@ final class LocationEngine: NSObject, ObservableObject {
         lastRouteLabel = routeLabel
         if let cardinal { lastCardinal = cardinal }
         if let speedKmh { lastSpeedKmh = speedKmh }
+        lastMinute = minute
+        if tempChanged || lastTemperatureC == nil { lastTemperatureC = temperatureC }
 
-        pushActivityIfNeeded(newState, important: townChanged || roadChanged || headingChanged || speedChanged)
+        pushActivityIfNeeded(newState, important: townChanged || roadChanged
+            || headingChanged || speedChanged || timeChanged || tempChanged)
     }
 
     /// Push the current (frozen) readout with the latest `isPaused`, clearing
@@ -408,10 +460,17 @@ final class LocationEngine: NSObject, ObservableObject {
         s.flashHex = appearance.flashHex
         s.backgroundID = appearance.backgroundID
         s.backgroundContrast = appearance.backgroundContrast
+        s.unitIsMetric = appearance.unitIsMetric
+        s.unitIsCelsius = appearance.unitIsCelsius
+        s.clock24 = appearance.clock24
+        s.complications = appearance.complications
+        s.temperatureC = temperatureC
         s.townChanged = false
         s.roadChanged = false
         s.headingChanged = false
         s.speedLimitChanged = false
+        s.timeChanged = false
+        s.temperatureChanged = false
         state = s
 
         guard let activity else { return }
@@ -485,6 +544,53 @@ final class LocationEngine: NSObject, ObservableObject {
                 self.roadInfoResult = info
             }
         }
+    }
+
+    // MARK: Temperature (Open-Meteo current weather)
+
+    /// Fetch current air temperature when the complication is shown. Sparse:
+    /// once, then after ~3 km of movement or every ~10 minutes.
+    private func maybeFetchTemperature(_ location: CLLocation) {
+        guard networkAvailable, !tempInFlight else { return }
+        let movedFar = tempFetchLocation.map { location.distance(from: $0) > 3000 } ?? true
+        let need = temperatureC == nil || movedFar
+            || Date().timeIntervalSince(lastTempFetch) > tempRefreshInterval
+        guard need, Date().timeIntervalSince(lastTempFetch) > 15 else { return }
+
+        tempInFlight = true
+        lastTempFetch = Date()
+        let target = location
+        Task { [weak self] in
+            guard let self else { return }
+            defer { Task { @MainActor in self.tempInFlight = false } }
+            guard let celsius = await Self.fetchTemperature(target) else { return }
+            await MainActor.run {
+                self.temperatureC = celsius
+                self.tempFetchLocation = target
+            }
+        }
+    }
+
+    private static func fetchTemperature(_ location: CLLocation) async -> Double? {
+        var comp = URLComponents(string: "https://api.open-meteo.com/v1/forecast")!
+        comp.queryItems = [
+            URLQueryItem(name: "latitude", value: String(format: "%.4f", location.coordinate.latitude)),
+            URLQueryItem(name: "longitude", value: String(format: "%.4f", location.coordinate.longitude)),
+            URLQueryItem(name: "current", value: "temperature_2m"),
+        ]
+        guard let url = comp.url else { return nil }
+        var req = URLRequest(url: url)
+        req.setValue("YouAreHere/1.0 (iOS wayfinding app)", forHTTPHeaderField: "User-Agent")
+        req.timeoutInterval = 12
+        guard let (data, response) = try? await URLSession.shared.data(for: req),
+              (response as? HTTPURLResponse)?.statusCode == 200,
+              let decoded = try? JSONDecoder().decode(TemperatureResponse.self, from: data) else { return nil }
+        return decoded.current.temperature_2m
+    }
+
+    private struct TemperatureResponse: Decodable {
+        struct Current: Decodable { let temperature_2m: Double }
+        let current: Current
     }
 
     // MARK: Live Activity

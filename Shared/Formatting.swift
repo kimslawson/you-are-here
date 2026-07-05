@@ -65,4 +65,29 @@ enum Formatting {
 
     /// The unit abbreviation for the current setting.
     static func speedUnit(metric: Bool) -> String { metric ? "km/h" : "mph" }
+
+    /// Current time, no seconds. 24-hour "17:03" or 12-hour "5:03 PM".
+    static func timeString(_ date: Date, clock24: Bool) -> String {
+        let cal = Calendar.current
+        let h = cal.component(.hour, from: date)
+        let m = cal.component(.minute, from: date)
+        if clock24 {
+            return String(format: "%d:%02d", h, m)
+        }
+        let h12 = h % 12 == 0 ? 12 : h % 12
+        return String(format: "%d:%02d %@", h12, m, h < 12 ? "AM" : "PM")
+    }
+
+    /// Whole-degree temperature in the display unit, e.g. "54°". Em dash unknown.
+    static func temperatureString(celsius: Double?, metric: Bool) -> String {
+        guard let celsius else { return "—" }
+        let value = metric ? celsius : celsius * 9 / 5 + 32
+        return "\(Int(value.rounded()))°"
+    }
+
+    /// Display-unit whole-degree value, for the >1° change comparison.
+    static func temperatureValue(celsius: Double?, metric: Bool) -> Int? {
+        guard let celsius else { return nil }
+        return Int((metric ? celsius : celsius * 9 / 5 + 32).rounded())
+    }
 }

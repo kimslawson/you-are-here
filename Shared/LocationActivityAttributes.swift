@@ -37,9 +37,18 @@ struct LocationActivityAttributes: ActivityAttributes {
         /// north (a raw 350°→10° would otherwise spin backwards 340°).
         var headingContinuous: Double?
 
-        /// Whether the user prefers metric. Carried in state so the widget
-        /// renders correctly without needing a shared app group.
+        /// Whether the user prefers metric distance (m/km vs ft/mi). Carried in
+        /// state so the widget renders correctly without a shared app group.
         var unitIsMetric: Bool
+        /// Temperature unit: true = °C, false = °F.
+        var unitIsCelsius: Bool
+        /// Clock: true = 24-hour, false = 12-hour.
+        var clock24: Bool
+        /// Enabled bottom-line complications, comma-joined raw values in order.
+        var complications: String
+        /// Current air temperature in °C (canonical); formatted per unit. nil
+        /// when unknown / the temperature complication is off.
+        var temperatureC: Double?
         /// Chosen UI typeface (`AppFont` raw value); carried for the same reason.
         var fontID: String
         /// Light mode (inverted palette); carried for the same reason.
@@ -66,6 +75,10 @@ struct LocationActivityAttributes: ActivityAttributes {
         var roadChanged: Bool
         var headingChanged: Bool
         var speedLimitChanged: Bool
+        /// Set on the update where the displayed minute rolled over.
+        var timeChanged: Bool
+        /// Set when the temperature moved more than one display degree.
+        var temperatureChanged: Bool
 
         /// Big-line text while no town is known, reflecting *why* it's unknown:
         /// parked (not looking), offline, or actively locating. ASCII periods,
@@ -85,6 +98,10 @@ struct LocationActivityAttributes: ActivityAttributes {
                 headingDegrees: 305,
                 headingContinuous: 305,
                 unitIsMetric: false,
+                unitIsCelsius: false,
+                clock24: false,
+                complications: Complication.defaultRaw,
+                temperatureC: 7,
                 fontID: AppFont.helvetica.rawValue,
                 lightMode: false,
                 flashHex: nil,
@@ -96,7 +113,9 @@ struct LocationActivityAttributes: ActivityAttributes {
                 townChanged: false,
                 roadChanged: false,
                 headingChanged: false,
-                speedLimitChanged: false
+                speedLimitChanged: false,
+                timeChanged: false,
+                temperatureChanged: false
             )
         }
     }
