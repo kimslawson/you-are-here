@@ -168,20 +168,25 @@ enum BackgroundArtRenderer {
                        lineWidth: 1)
         }
 
-        // Verticals: static fan from the vanishing point.
+        // Verticals: a fan from the vanishing point. Portrait spaces them ~2×
+        // wider; the line count is chosen so even the outer ones reach the far
+        // left/right a little below the horizon, instead of leaving dark side
+        // wedges beside the readout (outer lines just run off the bottom edge).
         var fan = Path()
-        let bottomSpacing = w / 10
-        for i in -12...12 {
+        let bottomSpacing = (portrait ? 0.2 : 0.1) * w
+        let iMax = min(80, max(12, Int((w * 0.5) / (bottomSpacing * 0.10)) + 1))
+        for i in -iMax...iMax {
             fan.move(to: CGPoint(x: w * 0.5, y: horizonY))
             fan.addLine(to: CGPoint(x: w * 0.5 + CGFloat(i) * bottomSpacing, y: h))
         }
         ctx.stroke(fan, with: .color(magenta.opacity(min(1, 0.22 * contrast))), lineWidth: 1)
     }
 
-    /// A dim cyan city silhouette on the horizon: filled blocks with brighter
-    /// top edges and the occasional antenna. Heights/widths come from a
-    /// deterministic hash of the building index, so the skyline is fixed rather
-    /// than flickering every frame. A faint baseline grounds it on the horizon.
+    /// A cyan city skyline on the horizon as connected line art: one continuous
+    /// stroke stepping over adjacent building tops from the left baseline to the
+    /// right, plus the occasional antenna. See-through (no fill), so the sun
+    /// shows behind it. Heights/widths come from a deterministic hash of the
+    /// building index, so the skyline is fixed rather than flickering.
     private static func drawSkyline(_ ctx: inout GraphicsContext, width: CGFloat,
                                     horizonY: CGFloat, unit: CGFloat,
                                     color: Color, contrast: Double) {
@@ -191,27 +196,30 @@ enum BackgroundArtRenderer {
             h ^= h >> 33
             return CGFloat(h & 0xFFFF) / CGFloat(0xFFFF)
         }
-        var blocks = Path()
-        var tops = Path()
+        var line = Path()
+        var antennas = Path()
         let maxHeight = unit * 0.14
-        var x = -unit * 0.1
+        line.move(to: CGPoint(x: 0, y: horizonY))
+        var x: CGFloat = 0
         var i = 0
-        while x < width + unit * 0.1 {
+        while x < width {
             let bw = unit * (0.05 + rand(i, 1) * 0.06)
             let bh = maxHeight * (0.22 + rand(i, 2) * 0.78)
-            let rect = CGRect(x: x, y: horizonY - bh, width: bw * 0.9, height: bh)
-            blocks.addRect(rect)
-            tops.move(to: CGPoint(x: rect.minX, y: rect.minY))
-            tops.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
-            if rand(i, 3) > 0.82 {   // occasional antenna
-                tops.move(to: CGPoint(x: rect.midX, y: rect.minY))
-                tops.addLine(to: CGPoint(x: rect.midX, y: rect.minY - maxHeight * 0.4))
+            let top = horizonY - bh
+            let rightX = min(x + bw, width)
+            line.addLine(to: CGPoint(x: x, y: top))       // step up/down to this roof
+            line.addLine(to: CGPoint(x: rightX, y: top))  // across the roof
+            if rand(i, 3) > 0.82 {                          // occasional antenna
+                let ax = (x + rightX) / 2
+                antennas.move(to: CGPoint(x: ax, y: top))
+                antennas.addLine(to: CGPoint(x: ax, y: top - maxHeight * 0.4))
             }
             x += bw
             i += 1
         }
-        ctx.fill(blocks, with: .color(color.opacity(min(1, 0.20 * contrast))))
-        ctx.stroke(tops, with: .color(color.opacity(min(1, 0.55 * contrast))), lineWidth: 1)
+        line.addLine(to: CGPoint(x: width, y: horizonY))  // down to the baseline
+        ctx.stroke(line, with: .color(color.opacity(min(1, 0.60 * contrast))), lineWidth: 1.5)
+        ctx.stroke(antennas, with: .color(color.opacity(min(1, 0.55 * contrast))), lineWidth: 1)
         var baseline = Path()
         baseline.move(to: CGPoint(x: 0, y: horizonY))
         baseline.addLine(to: CGPoint(x: width, y: horizonY))
