@@ -19,6 +19,10 @@ struct ContentView: View {
     // Easter egg: 10 quick taps swap to Comic; 10 more swap back.
     @State private var eggTaps = 0
     @State private var lastEggTap = Date.distantPast
+    // Slope background: the scrubbed playhead time (nil = live), plus the drag's
+    // anchor captured at gesture start. Only meaningful when Slope is selected.
+    @State private var slopeSelected: Date?
+    @State private var slopeDragAnchor: Date?
 
     var body: some View {
         GeometryReader { geo in
@@ -32,7 +36,7 @@ struct ContentView: View {
                 if !needsPermission,
                    let art = BackgroundArt(rawValue: backgroundArt), art != .off,
                    !(art == .neon && engine.state.lightMode) {
-                    BackgroundArtView(kind: art)
+                    BackgroundArtView(kind: art, slopeSelected: slopeSelected)
                 }
 
                 // Offscreen-ish host for the PiP video layer (must be in the
@@ -46,11 +50,15 @@ struct ContentView: View {
                 if needsPermission {
                     permissionPrompt
                 } else {
-                    WayfindingView(state: engine.state,
+                    // Live, or — while scrubbing the Slope trail — the readout
+                    // recorded at the playhead moment.
+                    let scrub = slopeScrubReadout()
+                    WayfindingView(state: scrub.state,
                                    townSize: townSize(for: geo.size),
                                    alignment: .leading,
                                    // Portrait is cramped; double the speed sign.
-                                   speedSignScale: isPortrait ? 2 : 1) {
+                                   speedSignScale: isPortrait ? 2 : 1,
+                                   displayDate: scrub.displayDate) {
                         Button {
                             engine.togglePause()
                         } label: {
@@ -87,6 +95,7 @@ struct ContentView: View {
                 if !isPortrait { revealChrome() }
                 registerEggTap()
             }
+            .gesture(slopeDrag(width: geo.size.width))
         }
         .onAppear {
             // Keep awake on the dash while live; allow sleep when parked.
@@ -101,6 +110,11 @@ struct ContentView: View {
         }
         .onChange(of: pictureInPicture) { enabled in
             pip.setEnabled(enabled)
+        }
+        .onChange(of: backgroundArt) { _ in
+            // Switching away from Slope drops any scrub, so the next visit starts live.
+            slopeSelected = nil
+            slopeDragAnchor = nil
         }
         .onChange(of: pipLargeWindow) { _ in
             // Next frame carries the new canvas; the window animates to match.
@@ -162,6 +176,55 @@ struct ContentView: View {
     private func townSize(for size: CGSize) -> CGFloat {
         // Scale the headline to the screen; clamp for sanity.
         min(max(size.width * 0.16, 44), 120)
+    }
+
+    /// The readout to show: live, or — while scrubbing the Slope trail — the
+    /// recorded readout at the playhead, with live-only fields (speed sign,
+    /// flashes) suppressed and the time complication pinned to that moment.
+    private func slopeScrubReadout() -> (state: LocationActivityAttributes.ContentState, displayDate: Date?) {
+        guard BackgroundArt(rawValue: backgroundArt) == .slope,
+              let selected = slopeSelected,
+              let sample = engine.track.sample(at: selected) else {
+            return (engine.state, nil)
+        }
+        var s = engine.state
+        s.town = sample.town
+        s.road = sample.road
+        s.route = sample.route
+        s.altitudeMeters = sample.altitudeMeters
+        s.headingDegrees = sample.headingDegrees
+        s.headingContinuous = sample.headingContinuous
+        s.temperatureC = sample.temperatureC
+        s.speedLimitKmh = nil        // not recorded on the trail; a live-only concept
+        s.townChanged = false
+        s.roadChanged = false
+        s.headingChanged = false
+        s.speedLimitChanged = false
+        s.timeChanged = false
+        s.temperatureChanged = false
+        return (s, sample.date)
+    }
+
+    /// Pan the Slope playhead through the trip: drag right to rewind toward the
+    /// first recording, back to snap to live. A no-op unless Slope is the active
+    /// background. `minimumDistance` keeps taps (chrome, Easter egg) working.
+    private func slopeDrag(width: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 10)
+            .onChanged { value in
+                guard BackgroundArt(rawValue: backgroundArt) == .slope,
+                      engine.track.isScrubable else { return }
+                let pps = BackgroundArtRenderer.slopePointsPerSecond(width: width)
+                guard pps > 0 else { return }
+                if slopeDragAnchor == nil { slopeDragAnchor = slopeSelected ?? Date() }
+                // Drag right (positive width) reveals earlier time.
+                let deltaSeconds = Double(value.translation.width / pps)
+                let target = slopeDragAnchor!.addingTimeInterval(-deltaSeconds)
+                let earliest = engine.track.first?.date ?? Date()
+                let clamped = min(max(target, earliest), Date())
+                // Within a second of now: snap back to live tracking.
+                slopeSelected = Date().timeIntervalSince(clamped) < 1 ? nil : clamped
+            }
+            .onEnded { _ in slopeDragAnchor = nil }
     }
 
     private var permissionPrompt: some View {
@@ -252,6 +315,7 @@ struct SettingsView: View {
                         Text("Topo").tag(BackgroundArt.topo.rawValue)
                         Text("Procedural").tag(BackgroundArt.procedural.rawValue)
                         Text("Neon").tag(BackgroundArt.neon.rawValue)
+                        Text("Slope").tag(BackgroundArt.slope.rawValue)
                     }
                     .pickerStyle(.menu)
                     .onChange(of: backgroundArt) { _ in engine.reloadAppearance() }
@@ -265,7 +329,7 @@ struct SettingsView: View {
                             }
                         }
                     }
-                    Text("Purely aesthetic, dim backdrops behind the readout — also on the Live Activity and floating window (updating with the readout, about once a second). Streets sketches a tilted, slowly turning abstract of nearby roads. Topo draws real elevation contours around you, top-down. Both fetch from a third-party server (overpass-api.de / open-meteo.com), send your location, and appear in the app and floating window only — not the Live Activity. Procedural is Topo's offline twin: contour lines from on-device noise, no network, not real terrain (and the better pick in flat areas). Neon is a synthwave grid that scrolls at your actual driving speed; dark mode only.")
+                    Text("Purely aesthetic, dim backdrops behind the readout — also on the Live Activity and floating window (updating with the readout, about once a second). Streets sketches a tilted, slowly turning abstract of nearby roads. Topo draws real elevation contours around you, top-down. Both fetch from a third-party server (overpass-api.de / open-meteo.com), send your location, and appear in the app and floating window only — not the Live Activity. Procedural is Topo's offline twin: contour lines from on-device noise, no network, not real terrain (and the better pick in flat areas). Neon is a synthwave grid that scrolls at your actual driving speed; dark mode only. Slope charts your altitude over the drive so far (no network) — swipe it to rewind through the trip and the whole readout retraces with it; the floating window shows it live, and it's not on the Live Activity.")
                         .font(.footnote)
                         .foregroundColor(.secondary)
                 }

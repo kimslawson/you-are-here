@@ -38,6 +38,11 @@ final class LocationEngine: NSObject, ObservableObject {
     /// launch always starts live, never parked.
     @Published private(set) var isPaused = false
 
+    /// The drive's recorded trail (altitude + readout over time), feeding the
+    /// Slope background and its scrub-to-retrace gesture. Not `@Published`: views
+    /// read it during their own redraws, so there's no growing array to re-diff.
+    let track = TrackLog()
+
     // MARK: Collaborators
     private let manager = CLLocationManager()
     private let fuser = AltitudeFuser()
@@ -423,6 +428,13 @@ final class LocationEngine: NSObject, ObservableObject {
             timeChanged: timeChanged, temperatureChanged: tempChanged)
 
         state = newState
+
+        // Record the point on the drive's trail (for the Slope background). The
+        // spacing gate inside keeps storage bounded at fast refresh rates.
+        track.record(TrackSample(
+            date: now, altitudeMeters: altitude, town: town, road: road, route: route,
+            headingDegrees: heading, headingContinuous: continuousHeading,
+            temperatureC: temperatureC))
 
         // Commit the displayed values for the next comparison.
         lastTown = town

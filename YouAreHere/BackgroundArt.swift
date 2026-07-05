@@ -8,6 +8,9 @@ import CoreLocation
 /// render the same scenes statically.
 struct BackgroundArtView: View {
     let kind: BackgroundArt
+    /// Slope only: the scrubbed playhead time (nil = live), owned by ContentView
+    /// where the pan gesture lives.
+    var slopeSelected: Date?
 
     var body: some View {
         switch kind {
@@ -16,6 +19,7 @@ struct BackgroundArtView: View {
         case .topo:       TopoBackground()
         case .procedural: ProceduralBackground()
         case .neon:       NeonBackground()
+        case .slope:      SlopeBackground(selected: slopeSelected)
         }
     }
 }
@@ -324,6 +328,35 @@ struct NeonBackground: View {
                 // Idle crawl + speed: ~65 mph ≈ 2.4 grid rows/second.
                 let rowsPerSecond = 0.12 + smoothedSpeed * 0.08
                 phase = (phase + rowsPerSecond * dt).truncatingRemainder(dividingBy: 1)
+            }
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+    }
+}
+
+// MARK: - Slope (altitude sparkline of the drive so far)
+
+/// Plots the engine's recorded trail: current altitude on the right edge with a
+/// big dot, earlier terrain trailing off to the left. `selected` (from
+/// ContentView's pan gesture) moves the playhead into the past; nil tracks the
+/// live "now". Redraws on a slow timeline so the live trace keeps advancing.
+struct SlopeBackground: View {
+    @EnvironmentObject private var engine: LocationEngine
+    @AppStorage(SettingsKey.backgroundContrast) private var contrast = 1.0
+    /// nil = live (playhead follows now); a date = scrubbed into the past.
+    var selected: Date?
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 0.5)) { timeline in
+            Canvas { ctx, size in
+                BackgroundArtRenderer.drawSlope(
+                    &ctx, size: size,
+                    samples: engine.track.samples,
+                    playhead: selected ?? timeline.date,
+                    metric: engine.state.unitIsMetric,
+                    family: engine.state.appFont,
+                    contrast: contrast)
             }
         }
         .ignoresSafeArea()

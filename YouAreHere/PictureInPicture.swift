@@ -111,7 +111,10 @@ final class PiPManager: NSObject, ObservableObject {
         guard enabled, controller != nil else { return }
 
         let large = UserDefaults.standard.bool(forKey: SettingsKey.pipLargeWindow)
-        let renderer = ImageRenderer(content: PiPFrameView(state: state, large: large))
+        // Snapshot the trail by value for the Slope backdrop — the render closure
+        // runs off the environment, so we can't reach the engine from inside it.
+        let samples = engine?.track.samples ?? []
+        let renderer = ImageRenderer(content: PiPFrameView(state: state, large: large, samples: samples))
         renderer.scale = renderScale
         guard let image = renderer.cgImage,
               let pixelBuffer = Self.pixelBuffer(from: image),
@@ -215,6 +218,9 @@ private final class PiPPlaybackDelegate: NSObject, AVPictureInPictureSampleBuffe
 struct PiPFrameView: View {
     let state: LocationActivityAttributes.ContentState
     var large = false
+    /// The drive's trail, for the Slope backdrop. Passed by value because the
+    /// frame renders detached from the environment (see PiPManager.renderFrame).
+    var samples: [TrackSample] = []
 
     var body: some View {
         ZStack {
@@ -237,7 +243,7 @@ struct PiPFrameView: View {
     @ViewBuilder
     private var backdrop: some View {
         let art = BackgroundArt(rawValue: state.backgroundID)
-        if art == .streets || art == .topo || art == .procedural
+        if art == .streets || art == .topo || art == .procedural || art == .slope
             || (art == .neon && !state.lightMode) {
             Canvas { ctx, size in
                 switch art {
@@ -261,6 +267,12 @@ struct PiPFrameView: View {
                     BackgroundArtRenderer.drawNeon(
                         &ctx, size: size,
                         phase: BackgroundArtRenderer.neonAutoPhase(at: Date()),
+                        contrast: state.backgroundContrast)
+                case .slope:
+                    // Live playhead (no scrubbing in the floating window).
+                    BackgroundArtRenderer.drawSlope(
+                        &ctx, size: size, samples: samples, playhead: Date(),
+                        metric: state.unitIsMetric, family: state.appFont,
                         contrast: state.backgroundContrast)
                 default:
                     break

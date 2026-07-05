@@ -18,6 +18,11 @@ enum BackgroundArt: String, CaseIterable, Identifiable {
     /// Dim synthwave grid whose scroll speed follows GPS speed (in the app;
     /// elsewhere it rolls at a steady idle). Dark mode only.
     case neon
+    /// An altitude sparkline of the drive so far, the current altitude on the
+    /// right edge trailing off to the left. App + PiP only (the trail lives in
+    /// the app process): the app lets you swipe it back through the trip to
+    /// retrace the readout; the floating window shows it live, un-scrubbed.
+    case slope
 
     var id: String { rawValue }
 }
@@ -220,6 +225,115 @@ enum BackgroundArtRenderer {
         baseline.move(to: CGPoint(x: 0, y: horizonY))
         baseline.addLine(to: CGPoint(x: width, y: horizonY))
         ctx.stroke(baseline, with: .color(color.opacity(min(1, 0.28 * contrast))), lineWidth: 1)
+    }
+
+    // MARK: Slope
+
+    /// The screen width spans this many seconds of the drive; older points
+    /// scroll off the left (pan to reveal them). Shared with the app's scrub
+    /// gesture so dragging N points reveals exactly the time it uncovers.
+    static let slopeWindowSeconds: Double = 360
+
+    static func slopePointsPerSecond(width: CGFloat) -> CGFloat {
+        width / CGFloat(slopeWindowSeconds)
+    }
+
+    /// An altitude sparkline of the drive so far. The right edge is a "playhead":
+    /// the sample at `playhead` sits there with a big dot on its altitude, and
+    /// earlier samples trail left, off-screen. The altitude axis auto-fits the
+    /// session's real min/max; faint gridline ticks and the min/max labels stay
+    /// pinned to the left while the trace pans behind them. Panning the playhead
+    /// into the past is the app's job — it hands us the chosen `playhead`; here
+    /// we only draw.
+    static func drawSlope(_ ctx: inout GraphicsContext, size: CGSize,
+                          samples: [TrackSample], playhead: Date,
+                          metric: Bool, family: AppFont, contrast: Double) {
+        let w = size.width, h = size.height
+        // The dot sits just inside the right edge so it isn't clipped in half.
+        let inset = max(6, min(w, h) * 0.05)
+        let anchorX = w - inset
+        let topPad = h * 0.16, botPad = h * 0.16
+
+        let alts = samples.compactMap { $0.altitudeMeters }
+        guard samples.count >= 2, let lo = alts.min(), let hi = alts.max() else { return }
+        let (yMin, yMax, step) = slopeAxis(lo: lo, hi: hi)
+        func y(_ meters: Double) -> CGFloat {
+            let f = (meters - yMin) / max(1, yMax - yMin)
+            return h - botPad - CGFloat(f) * (h - topPad - botPad)
+        }
+        let pps = slopePointsPerSecond(width: w)
+
+        // Gridline ticks (screen-pinned; the trace pans behind them).
+        var grid = Path()
+        var level = (yMin / step).rounded(.up) * step
+        while level <= yMax {
+            let gy = y(level)
+            grid.move(to: CGPoint(x: 0, y: gy))
+            grid.addLine(to: CGPoint(x: w, y: gy))
+            level += step
+        }
+        ctx.stroke(grid, with: .color(Theme.secondary.opacity(min(1, 0.14 * contrast))), lineWidth: 1)
+
+        // Min / max labels, pinned to the left, nudged in from the edges.
+        let labelColor = Theme.secondary.opacity(min(1, 0.5 * contrast))
+        let labelFont = Theme.font(size: max(9, min(w, h) * 0.03), weight: .medium, family: family)
+        func label(_ meters: Double, at gy: CGFloat) {
+            ctx.draw(Text(Formatting.altitudeString(meters: meters, metric: metric))
+                        .font(labelFont).foregroundColor(labelColor),
+                     at: CGPoint(x: 5, y: gy), anchor: .leading)
+        }
+        label(hi, at: max(y(hi), topPad * 0.7))
+        label(lo, at: min(y(lo), h - botPad * 0.7))
+
+        // The trace, up to the playhead. Only near-visible points join the path
+        // (everything older is off the left edge anyway).
+        let leftCutoff = playhead.addingTimeInterval(-Double((anchorX + 24) / pps))
+        var line = Path()
+        var started = false
+        for s in samples {
+            if s.date < leftCutoff { continue }
+            if s.date > playhead { break }        // samples are time-sorted
+            guard let a = s.altitudeMeters else { continue }
+            let p = CGPoint(x: anchorX - CGFloat(playhead.timeIntervalSince(s.date)) * pps, y: y(a))
+            if started { line.addLine(to: p) } else { line.move(to: p); started = true }
+        }
+
+        let traceColor = Theme.secondary.opacity(min(1, 0.5 * contrast))
+        guard let headAlt = slopeAltitude(at: playhead, samples: samples) else {
+            ctx.stroke(line, with: .color(traceColor), lineWidth: 1.6)
+            return
+        }
+        // Connect the trace to the playhead dot, then draw the dot on the
+        // current altitude.
+        let dot = CGPoint(x: anchorX, y: y(headAlt))
+        if started { line.addLine(to: dot) } else { line.move(to: dot) }
+        ctx.stroke(line, with: .color(traceColor), lineWidth: 1.6)
+
+        let r = max(3, min(w, h) * 0.02)
+        ctx.fill(Path(ellipseIn: CGRect(x: dot.x - r, y: dot.y - r, width: r * 2, height: r * 2)),
+                 with: .color(Theme.primary.opacity(min(1, 0.75 * contrast))))
+    }
+
+    /// The recorded altitude at or before `date` (last non-nil), for the dot.
+    private static func slopeAltitude(at date: Date, samples: [TrackSample]) -> Double? {
+        for s in samples.reversed() where s.date <= date {
+            if let a = s.altitudeMeters { return a }
+        }
+        return nil
+    }
+
+    /// A padded altitude window and a "nice" gridline step (meters) from the
+    /// session's real min/max, so ticks land on round-ish values and the range
+    /// grows as new extremes arrive.
+    private static func slopeAxis(lo: Double, hi: Double) -> (yMin: Double, yMax: Double, step: Double) {
+        let span = max(hi - lo, 1)
+        let pad = span * 0.12
+        let yMin = lo - pad, yMax = hi + pad
+        let raw = (yMax - yMin) / 4                    // aim for ~4 gridlines
+        let mag = pow(10, floor(log10(max(raw, 1))))
+        let norm = raw / mag
+        let niceNorm: Double = norm < 1.5 ? 1 : (norm < 3 ? 2 : (norm < 7 ? 5 : 10))
+        return (yMin, yMax, niceNorm * mag)
     }
 }
 

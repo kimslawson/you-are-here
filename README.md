@@ -99,6 +99,17 @@ When the **town, road, or compass direction changes**, that field briefly
     your actual GPS speed (low-passed, plus a slow idle crawl; ~65 mph ≈ 2.4
     rows/s). Loops seamlessly — the scene is periodic per grid row. Dark mode
     only: dim glow has nothing to glow against on white.
+  - **Slope** — an altitude sparkline of the drive so far: current altitude on
+    the right edge with a big dot, earlier terrain trailing off to the left. The
+    axis auto-fits the session's real min/max with faint gridline ticks and
+    min/max labels pinned to the left. Fed by an in-app trail (`TrackLog` records
+    the readout each tick; `TrackSample` in Shared); no network, session-scoped
+    (a cold launch starts fresh, capped ~12 h). In the app you can **swipe to
+    scrub** the playhead back through the whole trip — the entire readout (town,
+    road/route, altitude, heading, temperature, and the time complication)
+    retraces with it; swipe back to snap to live. App + PiP only (the trail lives
+    in the app process, and it's too big for the Live Activity's state budget);
+    the floating window shows it live, un-scrubbed.
 - **Easter egg:** tap the app screen 10 times in quick succession and the whole
   UI switches to Comic Sans (well, Comic Neue — iOS doesn't ship the real
   thing). Ten more taps restore whatever font you had before.

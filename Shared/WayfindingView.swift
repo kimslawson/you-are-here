@@ -19,6 +19,10 @@ struct WayfindingView<Trailing: View>: View {
     /// to their townSize-derived default. The PiP strip bumps this above 1 so
     /// secondary type stays legible at video-frame sizes.
     var smallScale: CGFloat = 1
+    /// Clock the time complication reads. nil means "now" (the live default);
+    /// the app passes a past timestamp while scrubbing the Slope trail so the
+    /// time retraces along with the rest of the readout.
+    var displayDate: Date? = nil
     /// Optional control pinned to the trailing end of the altitude/heading line
     /// (e.g. the park/resume button).
     @ViewBuilder var trailing: () -> Trailing
@@ -178,7 +182,7 @@ struct WayfindingView<Trailing: View>: View {
                 CompassArrow(degrees: state.headingContinuous, size: size * 0.85, color: color)
             }
         case .time:
-            complicationText(Formatting.timeString(Date(), clock24: state.clock24),
+            complicationText(Formatting.timeString(displayDate ?? Date(), clock24: state.clock24),
                              color: Theme.textColor(changed: state.timeChanged, base: Theme.secondary),
                              size: size)
         case .temperature:
