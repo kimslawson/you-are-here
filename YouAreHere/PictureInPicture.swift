@@ -261,7 +261,6 @@ struct PiPFrameView: View {
                     BackgroundArtRenderer.drawNeon(
                         &ctx, size: size,
                         phase: BackgroundArtRenderer.neonAutoPhase(at: Date()),
-                        heading: state.headingContinuous ?? state.headingDegrees ?? 0,
                         contrast: state.backgroundContrast)
                 default:
                     break

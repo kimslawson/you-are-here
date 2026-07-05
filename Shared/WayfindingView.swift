@@ -120,12 +120,17 @@ struct WayfindingView<Trailing: View>: View {
     // MARK: Line 3 — optional complications (dot-separated) + trailing control.
     // With none chosen the row is empty but keeps its height (the trailing
     // control holds it), so the town/road lines above don't move.
+    //
+    // The whole complications block scales as ONE unit (ViewThatFits picks the
+    // largest candidate scale that fits), so every value shares a single font
+    // size and nothing ever truncates — rather than each value shrinking
+    // independently.
     private var metricsLine: some View {
-        let comps = Complication.decode(state.complications)
-        return HStack(spacing: smallSize * 0.6) {
-            ForEach(Array(comps.enumerated()), id: \.offset) { index, comp in
-                if index > 0 { SeparatorDot(size: smallSize) }
-                complication(comp)
+        HStack(spacing: smallSize * 0.6) {
+            ViewThatFits(in: .horizontal) {
+                ForEach([1.0, 0.9, 0.8, 0.72, 0.64, 0.56, 0.48, 0.42], id: \.self) { scale in
+                    complicationsRow(scale: CGFloat(scale))
+                }
             }
             if !state.hasSignal {
                 Image(systemName: "wifi.slash")
@@ -135,50 +140,59 @@ struct WayfindingView<Trailing: View>: View {
             Spacer(minLength: 0)
             trailing()
         }
+    }
+
+    private func complicationsRow(scale: CGFloat) -> some View {
+        let size = smallSize * scale
+        let comps = Complication.decode(state.complications)
+        return HStack(spacing: size * 0.7) {
+            ForEach(Array(comps.enumerated()), id: \.offset) { index, comp in
+                if index > 0 { SeparatorDot(size: size) }
+                complication(comp, size: size)
+            }
+        }
         .lineLimit(1)
-        .minimumScaleFactor(0.6)
+        .fixedSize(horizontal: true, vertical: false)   // measure/render at natural width
     }
 
     @ViewBuilder
-    private func complication(_ c: Complication) -> some View {
+    private func complication(_ c: Complication, size: CGFloat) -> some View {
         switch c {
         case .altitude:
-            complicationLabel(
-                Formatting.altitudeString(meters: state.altitudeMeters, metric: state.unitIsMetric),
-                color: Theme.secondary,
-                icon: "mountain.2.fill")
+            // Altitude and compass keep their icons; time and temperature are
+            // text-only to leave room and stay uniform.
+            Label {
+                complicationText(Formatting.altitudeString(meters: state.altitudeMeters,
+                                                           metric: state.unitIsMetric),
+                                 color: Theme.secondary, size: size)
+            } icon: {
+                Image(systemName: "mountain.2.fill")
+                    .font(.system(size: size * 0.85))
+                    .foregroundColor(Theme.secondary)
+            }
         case .compass:
             let color = Theme.textColor(changed: state.headingChanged, base: Theme.secondary)
             Label {
-                Text(Formatting.headingString(state.headingDegrees))
-                    .font(state.font(size: smallSize, weight: .medium))
-                    .foregroundColor(color)
+                complicationText(Formatting.headingString(state.headingDegrees), color: color, size: size)
             } icon: {
-                CompassArrow(degrees: state.headingContinuous, size: smallSize * 0.85, color: color)
+                CompassArrow(degrees: state.headingContinuous, size: size * 0.85, color: color)
             }
         case .time:
-            complicationLabel(
-                Formatting.timeString(Date(), clock24: state.clock24),
-                color: Theme.textColor(changed: state.timeChanged, base: Theme.secondary),
-                icon: "clock")
+            complicationText(Formatting.timeString(Date(), clock24: state.clock24),
+                             color: Theme.textColor(changed: state.timeChanged, base: Theme.secondary),
+                             size: size)
         case .temperature:
-            complicationLabel(
-                Formatting.temperatureString(celsius: state.temperatureC, metric: state.unitIsCelsius),
-                color: Theme.textColor(changed: state.temperatureChanged, base: Theme.secondary),
-                icon: "thermometer")
+            complicationText(Formatting.temperatureString(celsius: state.temperatureC,
+                                                          metric: state.unitIsCelsius),
+                             color: Theme.textColor(changed: state.temperatureChanged, base: Theme.secondary),
+                             size: size)
         }
     }
 
-    private func complicationLabel(_ text: String, color: Color, icon: String) -> some View {
-        Label {
-            Text(text)
-                .font(state.font(size: smallSize, weight: .medium))
-                .foregroundColor(color)
-        } icon: {
-            Image(systemName: icon)
-                .font(.system(size: smallSize * 0.85))
-                .foregroundColor(color)
-        }
+    private func complicationText(_ text: String, color: Color, size: CGFloat) -> some View {
+        Text(text)
+            .font(state.font(size: size, weight: .medium))
+            .foregroundColor(color)
     }
 }
 

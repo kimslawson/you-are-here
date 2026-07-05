@@ -105,7 +105,7 @@ enum BackgroundArtRenderer {
     }
 
     static func drawNeon(_ ctx: inout GraphicsContext, size: CGSize, phase: Double,
-                         heading: Double = 0, contrast: Double = 1) {
+                         contrast: Double = 1) {
         let w = size.width, h = size.height
         let horizonY = h * 0.42
         let gridHeight = h - horizonY
@@ -142,10 +142,10 @@ enum BackgroundArtRenderer {
             }
         }
 
-        // Cyan procedural city skyline sitting on the horizon, panning with the
-        // compass heading (deterministic per building index, so it's stable).
+        // Cyan procedural city skyline sitting on the horizon (stable frame to
+        // frame — deterministic per building index).
         drawSkyline(&ctx, width: w, horizonY: horizonY, unit: min(w, h),
-                    color: cyan, contrast: contrast, heading: heading)
+                    color: cyan, contrast: contrast)
 
         // Rows spaced in world depth, projected as 1/depth, sliding toward the
         // viewer as phase rises (seamless: the pattern repeats every `step`, and
@@ -182,73 +182,40 @@ enum BackgroundArtRenderer {
         ctx.stroke(fan, with: .color(magenta.opacity(min(1, 0.22 * contrast))), lineWidth: 1)
     }
 
-    /// A cyan city skyline as connected line art that pans with the compass.
-    /// The full skyline is a seamless 360° loop; the ~90° FOV means it's 4×
-    /// screen-width wide, and heading scrolls a one-screen window through it.
-    /// A fixed set of `n` buildings (hashed widths/heights) is scaled to tile
-    /// the panorama exactly, and the building index wraps mod n — so the strip
-    /// meets itself at north with no seam. See-through (no fill): the sun shows
-    /// through it.
+    /// A dim cyan city silhouette on the horizon: filled blocks with brighter
+    /// top edges and the occasional antenna. Heights/widths come from a
+    /// deterministic hash of the building index, so the skyline is fixed rather
+    /// than flickering every frame. A faint baseline grounds it on the horizon.
     private static func drawSkyline(_ ctx: inout GraphicsContext, width: CGFloat,
                                     horizonY: CGFloat, unit: CGFloat,
-                                    color: Color, contrast: Double, heading: Double) {
+                                    color: Color, contrast: Double) {
         func rand(_ i: Int, _ salt: Int) -> CGFloat {
             var h = UInt64(bitPattern: Int64(i &* 73856093 ^ salt &* 19349663))
             h = (h ^ (h >> 33)) &* 0xff51afd7ed558ccd
             h ^= h >> 33
             return CGFloat(h & 0xFFFF) / CGFloat(0xFFFF)
         }
-        let n = 48
+        var blocks = Path()
+        var tops = Path()
         let maxHeight = unit * 0.14
-        // Base widths + cumulative starts over one period, then scaled so the
-        // n buildings tile the 4×-width panorama exactly (seamless wrap).
-        var starts = [CGFloat](repeating: 0, count: n)
-        var widths = [CGFloat](repeating: 0, count: n)
-        var total: CGFloat = 0
-        for m in 0..<n {
-            starts[m] = total
-            widths[m] = unit * (0.05 + rand(m, 1) * 0.06)
-            total += widths[m]
-        }
-        let panoWidth = width * 4          // 90° FOV → 360° is 4 screens
-        let scale = panoWidth / total
-        let offset = CGFloat(heading / 360) * panoWidth   // pan by heading
-
-        func mod(_ k: Int) -> Int { ((k % n) + n) % n }
-        // Continuous position of building k (any integer) across periods.
-        func pos(_ k: Int) -> CGFloat {
-            CGFloat((k >= 0 ? k / n : (k - n + 1) / n)) * panoWidth + starts[mod(k)] * scale
-        }
-        func w(_ k: Int) -> CGFloat { widths[mod(k)] * scale }
-        func h(_ k: Int) -> CGFloat { maxHeight * (0.22 + rand(mod(k), 2) * 0.78) }
-
-        // First building at or left of the window, then draw across the window.
-        var k = Int((offset / panoWidth * CGFloat(n)).rounded(.down)) - 2
-        while pos(k + 1) <= offset { k += 1 }
-        while pos(k) > offset { k -= 1 }
-
-        var line = Path()
-        var antennas = Path()
-        line.move(to: CGPoint(x: pos(k) - offset, y: horizonY))
-        var guardCount = 0
-        while pos(k) - offset < width + w(k), guardCount < 256 {
-            let x = pos(k) - offset
-            let top = horizonY - h(k)
-            let rightX = x + w(k)
-            line.addLine(to: CGPoint(x: x, y: top))       // step to this roof
-            line.addLine(to: CGPoint(x: rightX, y: top))  // across the roof
-            if rand(mod(k), 3) > 0.82 {                    // occasional antenna
-                let ax = (x + rightX) / 2
-                antennas.move(to: CGPoint(x: ax, y: top))
-                antennas.addLine(to: CGPoint(x: ax, y: top - maxHeight * 0.4))
+        var x = -unit * 0.1
+        var i = 0
+        while x < width + unit * 0.1 {
+            let bw = unit * (0.05 + rand(i, 1) * 0.06)
+            let bh = maxHeight * (0.22 + rand(i, 2) * 0.78)
+            let rect = CGRect(x: x, y: horizonY - bh, width: bw * 0.9, height: bh)
+            blocks.addRect(rect)
+            tops.move(to: CGPoint(x: rect.minX, y: rect.minY))
+            tops.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+            if rand(i, 3) > 0.82 {   // occasional antenna
+                tops.move(to: CGPoint(x: rect.midX, y: rect.minY))
+                tops.addLine(to: CGPoint(x: rect.midX, y: rect.minY - maxHeight * 0.4))
             }
-            k += 1
-            guardCount += 1
+            x += bw
+            i += 1
         }
-        line.addLine(to: CGPoint(x: pos(k) - offset, y: horizonY))  // down to baseline
-
-        ctx.stroke(line, with: .color(color.opacity(min(1, 0.60 * contrast))), lineWidth: 1.5)
-        ctx.stroke(antennas, with: .color(color.opacity(min(1, 0.55 * contrast))), lineWidth: 1)
+        ctx.fill(blocks, with: .color(color.opacity(min(1, 0.20 * contrast))))
+        ctx.stroke(tops, with: .color(color.opacity(min(1, 0.55 * contrast))), lineWidth: 1)
         var baseline = Path()
         baseline.move(to: CGPoint(x: 0, y: horizonY))
         baseline.addLine(to: CGPoint(x: width, y: horizonY))
