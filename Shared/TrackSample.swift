@@ -10,6 +10,9 @@ import Foundation
 struct TrackSample {
     var date: Date
     var altitudeMeters: Double?
+    /// GPS position, for the Route background's 2-D path. nil when no fix.
+    var latitude: Double?
+    var longitude: Double?
     var town: String
     var road: String
     var route: RouteRef?

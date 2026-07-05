@@ -243,7 +243,8 @@ struct PiPFrameView: View {
     @ViewBuilder
     private var backdrop: some View {
         let art = BackgroundArt(rawValue: state.backgroundID)
-        if art == .streets || art == .topo || art == .procedural || art == .slope
+        if art == .streets || art == .topo || art == .procedural
+            || art == .slope || art == .route
             || (art == .neon && !state.lightMode) {
             Canvas { ctx, size in
                 switch art {
@@ -274,6 +275,11 @@ struct PiPFrameView: View {
                         &ctx, size: size, samples: samples, playhead: Date(),
                         metric: state.unitIsMetric, family: state.appFont,
                         contrast: state.backgroundContrast)
+                case .route:
+                    // Live, fit-to-view (no scrub or pinch in the floating window).
+                    BackgroundArtRenderer.drawRoute(
+                        &ctx, size: size, samples: samples, playhead: Date(),
+                        zoom: 1, contrast: state.backgroundContrast)
                 default:
                     break
                 }

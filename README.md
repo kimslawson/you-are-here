@@ -110,6 +110,15 @@ When the **town, road, or compass direction changes**, that field briefly
     retraces with it; swipe back to snap to live. App + PiP only (the trail lives
     in the app process, and it's too big for the Live Activity's state budget);
     the floating window shows it live, un-scrubbed.
+  - **Route** — the same trail as a 2-D map: the path you've driven
+    (equirectangular projection of the recorded GPS coordinates), auto-fit to
+    the view with a dot at your position. Swipe to move the dot back along the
+    path (the readout retraces, same as Slope); pinch to zoom, floored at the
+    whole-route extent (can't zoom out further) and following the dot as you
+    zoom in. In this view the layout reflows: the town is appended to the
+    road/route line, and the top and bottom lines hug the view edges to clear
+    the center for the map. Same App + PiP scope as Slope. Both Slope and Route
+    draw in the flash color.
 - **Easter egg:** tap the app screen 10 times in quick succession and the whole
   UI switches to Comic Sans (well, Comic Neue — iOS doesn't ship the real
   thing). Ten more taps restore whatever font you had before.

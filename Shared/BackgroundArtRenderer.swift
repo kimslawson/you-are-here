@@ -23,6 +23,11 @@ enum BackgroundArt: String, CaseIterable, Identifiable {
     /// the app process): the app lets you swipe it back through the trip to
     /// retrace the readout; the floating window shows it live, un-scrubbed.
     case slope
+    /// A 2-D trace of the route driven so far, auto-fit to the view with a dot
+    /// at your position. App + PiP only (same trail as Slope): the app lets you
+    /// swipe the dot back along the path (retracing the readout) and pinch to
+    /// zoom; the floating window shows it live, un-scrubbed, fit-to-view.
+    case route
 
     var id: String { rawValue }
 }
@@ -298,7 +303,9 @@ enum BackgroundArtRenderer {
             if started { line.addLine(to: p) } else { line.move(to: p); started = true }
         }
 
-        let traceColor = Theme.secondary.opacity(min(1, 0.5 * contrast))
+        // The trace and dot draw in the flash color (the trail is the "live"
+        // element here); gridlines and labels stay dim.
+        let traceColor = Theme.flash.opacity(min(1, 0.55 * contrast))
         guard let headAlt = slopeAltitude(at: playhead, samples: samples) else {
             ctx.stroke(line, with: .color(traceColor), lineWidth: 1.6)
             return
@@ -311,7 +318,7 @@ enum BackgroundArtRenderer {
 
         let r = max(3, min(w, h) * 0.02)
         ctx.fill(Path(ellipseIn: CGRect(x: dot.x - r, y: dot.y - r, width: r * 2, height: r * 2)),
-                 with: .color(Theme.primary.opacity(min(1, 0.75 * contrast))))
+                 with: .color(Theme.flash.opacity(min(1, 0.85 * contrast))))
     }
 
     /// The recorded altitude at or before `date` (last non-nil), for the dot.
@@ -334,6 +341,89 @@ enum BackgroundArtRenderer {
         let norm = raw / mag
         let niceNorm: Double = norm < 1.5 ? 1 : (norm < 3 ? 2 : (norm < 7 ? 5 : 10))
         return (yMin, yMax, niceNorm * mag)
+    }
+
+    // MARK: Route
+
+    /// Zoom `1` fits the whole route; the app clamps its pinch to this floor so
+    /// you can't zoom out past the full extent.
+    static let routeMinZoom: CGFloat = 1
+    static let routeMaxZoom: CGFloat = 8
+
+    /// A 2-D trace of the route driven so far, in the flash color, with a dot at
+    /// the `playhead` position. The whole route auto-fits the view at `zoom` 1;
+    /// pinching in (zoom > 1) magnifies toward the dot. Panning the playhead
+    /// along the path is the app's job — it hands us `playhead`; here we draw.
+    static func drawRoute(_ ctx: inout GraphicsContext, size: CGSize,
+                          samples: [TrackSample], playhead: Date,
+                          zoom: CGFloat, contrast: Double) {
+        let w = size.width, h = size.height
+        let located = samples.filter { $0.latitude != nil && $0.longitude != nil }
+        guard !located.isEmpty else { return }
+
+        // Equirectangular projection around the route's mean coordinate (plenty
+        // accurate over a drive); north is up. y grows downward on screen, so
+        // negate latitude.
+        let n = Double(located.count)
+        let lat0 = located.reduce(0.0) { $0 + $1.latitude! } / n
+        let lon0 = located.reduce(0.0) { $0 + $1.longitude! } / n
+        let mPerLat = 111_320.0
+        let mPerLon = mPerLat * cos(lat0 * .pi / 180)
+        func project(_ s: TrackSample) -> CGPoint {
+            CGPoint(x: CGFloat((s.longitude! - lon0) * mPerLon),
+                    y: CGFloat(-(s.latitude! - lat0) * mPerLat))
+        }
+        let pts = located.map(project)
+
+        // Bounding box of the whole route → the fit scale (zoom 1 shows it all).
+        var minX = pts[0].x, maxX = pts[0].x, minY = pts[0].y, maxY = pts[0].y
+        for p in pts {
+            minX = min(minX, p.x); maxX = max(maxX, p.x)
+            minY = min(minY, p.y); maxY = max(maxY, p.y)
+        }
+        let bboxW = max(maxX - minX, 1), bboxH = max(maxY - minY, 1)
+        let bboxCenter = CGPoint(x: (minX + maxX) / 2, y: (minY + maxY) / 2)
+        // Fit with a margin; cap so a tiny (parked) route doesn't blow up to
+        // fill the screen with GPS jitter — keep at least ~40 m visible.
+        let minSide = min(w, h)
+        let fitScale = min((w * 0.86) / bboxW, (h * 0.86) / bboxH, minSide / 40)
+        let scale = fitScale * max(routeMinZoom, zoom)
+
+        // Focus: the bbox center when fully zoomed out (so the whole route stays
+        // on screen), easing to the dot as you pinch in (so it follows you).
+        let head = routeHead(playhead: playhead, located: located, project: project) ?? bboxCenter
+        let follow = min(1, max(0, (zoom - 1) / 0.5))
+        let focus = CGPoint(x: bboxCenter.x + (head.x - bboxCenter.x) * follow,
+                            y: bboxCenter.y + (head.y - bboxCenter.y) * follow)
+        func screen(_ p: CGPoint) -> CGPoint {
+            CGPoint(x: w / 2 + (p.x - focus.x) * scale, y: h / 2 + (p.y - focus.y) * scale)
+        }
+
+        let color = Theme.flash
+        if pts.count >= 2 {
+            var path = Path()
+            for (i, p) in pts.enumerated() {
+                let sp = screen(p)
+                if i == 0 { path.move(to: sp) } else { path.addLine(to: sp) }
+            }
+            ctx.stroke(path, with: .color(color.opacity(min(1, 0.55 * contrast))),
+                       style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+        }
+
+        // The "you are here" dot at the playhead.
+        let d = screen(head)
+        let r = max(3.5, minSide * 0.022)
+        ctx.fill(Path(ellipseIn: CGRect(x: d.x - r, y: d.y - r, width: r * 2, height: r * 2)),
+                 with: .color(color.opacity(min(1, 0.9 * contrast))))
+    }
+
+    /// The projected route point at or before `playhead` (the last located
+    /// sample not after it), for the dot.
+    private static func routeHead(playhead: Date, located: [TrackSample],
+                                  project: (TrackSample) -> CGPoint) -> CGPoint? {
+        var chosen: TrackSample?
+        for s in located where s.date <= playhead { chosen = s }
+        return (chosen ?? located.first).map(project)
     }
 }
 

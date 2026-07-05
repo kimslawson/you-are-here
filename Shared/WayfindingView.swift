@@ -23,6 +23,13 @@ struct WayfindingView<Trailing: View>: View {
     /// the app passes a past timestamp while scrubbing the Slope trail so the
     /// time retraces along with the rest of the readout.
     var displayDate: Date? = nil
+    /// Route view only: drop the big town headline and instead push the road
+    /// line to the top edge and the metrics line to the bottom edge, freeing the
+    /// center for the route trace. Pairs with `townInline`.
+    var edgeAligned: Bool = false
+    /// Route view only: append the town to the road/route line (since the big
+    /// town headline is gone under `edgeAligned`).
+    var townInline: Bool = false
     /// Optional control pinned to the trailing end of the altitude/heading line
     /// (e.g. the park/resume button).
     @ViewBuilder var trailing: () -> Trailing
@@ -36,13 +43,29 @@ struct WayfindingView<Trailing: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: alignment, spacing: townSize * 0.06) {
-            roadLine
-                .zIndex(1)   // the scaled-up speed sign overlaps the town line
-            townLine
-            metricsLine
+        content
+            .frame(maxWidth: .infinity, alignment: frameAlignment)
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if edgeAligned {
+            // Road (+ town) at the top edge, metrics at the bottom, route in
+            // between. Fills the height it's given so the Spacer can push them apart.
+            VStack(alignment: alignment, spacing: 0) {
+                roadLine
+                Spacer(minLength: 0)
+                metricsLine
+            }
+            .frame(maxHeight: .infinity)
+        } else {
+            VStack(alignment: alignment, spacing: townSize * 0.06) {
+                roadLine
+                    .zIndex(1)   // the scaled-up speed sign overlaps the town line
+                townLine
+                metricsLine
+            }
         }
-        .frame(maxWidth: .infinity, alignment: frameAlignment)
     }
 
     private var frameAlignment: Alignment {
@@ -74,6 +97,13 @@ struct WayfindingView<Trailing: View>: View {
                 Text(state.road.isEmpty ? "—" : state.road)
                     .font(state.font(size: smallSize, weight: .medium))
                     .foregroundColor(Theme.textColor(changed: state.roadChanged, base: Theme.secondary))
+            }
+            if townInline {
+                // Route view: town rides at the end of the road line.
+                SeparatorDot(size: smallSize)
+                Text(state.town.isEmpty ? state.townPlaceholder : state.town)
+                    .font(state.font(size: smallSize, weight: .medium))
+                    .foregroundColor(Theme.textColor(changed: state.townChanged, base: Theme.secondary))
             }
             Spacer(minLength: smallSize * 0.5)
             if let limit = Formatting.speedLimitValue(kmh: state.speedLimitKmh, metric: state.unitIsMetric) {

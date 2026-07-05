@@ -432,7 +432,9 @@ final class LocationEngine: NSObject, ObservableObject {
         // Record the point on the drive's trail (for the Slope background). The
         // spacing gate inside keeps storage bounded at fast refresh rates.
         track.record(TrackSample(
-            date: now, altitudeMeters: altitude, town: town, road: road, route: route,
+            date: now, altitudeMeters: altitude,
+            latitude: loc.coordinate.latitude, longitude: loc.coordinate.longitude,
+            town: town, road: road, route: route,
             headingDegrees: heading, headingContinuous: continuousHeading,
             temperatureC: temperatureC))
 

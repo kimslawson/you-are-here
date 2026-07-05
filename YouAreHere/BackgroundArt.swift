@@ -8,9 +8,11 @@ import CoreLocation
 /// render the same scenes statically.
 struct BackgroundArtView: View {
     let kind: BackgroundArt
-    /// Slope only: the scrubbed playhead time (nil = live), owned by ContentView
-    /// where the pan gesture lives.
+    /// Slope / Route only: the scrubbed playhead time (nil = live), owned by
+    /// ContentView where the pan gesture lives.
     var slopeSelected: Date?
+    /// Route only: pinch-zoom factor (1 = whole route fit to view).
+    var routeZoom: CGFloat = 1
 
     var body: some View {
         switch kind {
@@ -20,6 +22,7 @@ struct BackgroundArtView: View {
         case .procedural: ProceduralBackground()
         case .neon:       NeonBackground()
         case .slope:      SlopeBackground(selected: slopeSelected)
+        case .route:      RouteBackground(selected: slopeSelected, zoom: routeZoom)
         }
     }
 }
@@ -356,6 +359,34 @@ struct SlopeBackground: View {
                     playhead: selected ?? timeline.date,
                     metric: engine.state.unitIsMetric,
                     family: engine.state.appFont,
+                    contrast: contrast)
+            }
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+    }
+}
+
+// MARK: - Route (2-D trace of the drive so far)
+
+/// Draws the engine's trail as a route map — the path auto-fit to the view with
+/// a dot at the playhead. `selected` (from ContentView's pan gesture) moves the
+/// dot back along the path; `zoom` (from the pinch gesture) magnifies toward it.
+/// nil `selected` tracks live "now".
+struct RouteBackground: View {
+    @EnvironmentObject private var engine: LocationEngine
+    @AppStorage(SettingsKey.backgroundContrast) private var contrast = 1.0
+    var selected: Date?
+    var zoom: CGFloat = 1
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 0.5)) { timeline in
+            Canvas { ctx, size in
+                BackgroundArtRenderer.drawRoute(
+                    &ctx, size: size,
+                    samples: engine.track.samples,
+                    playhead: selected ?? timeline.date,
+                    zoom: zoom,
                     contrast: contrast)
             }
         }
