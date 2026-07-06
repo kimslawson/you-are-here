@@ -78,11 +78,12 @@ enum Formatting {
         return String(format: "%d:%02d %@", h12, m, h < 12 ? "AM" : "PM")
     }
 
-    /// Whole-degree temperature in the display unit, e.g. "54°". Em dash unknown.
+    /// Whole-degree temperature in the display unit, e.g. "54°F" / "12°C". Em
+    /// dash unknown. (`metric` here means Celsius — the temperature-unit flag.)
     static func temperatureString(celsius: Double?, metric: Bool) -> String {
         guard let celsius else { return "—" }
         let value = metric ? celsius : celsius * 9 / 5 + 32
-        return "\(Int(value.rounded()))°"
+        return "\(Int(value.rounded()))°\(metric ? "C" : "F")"
     }
 
     /// Display-unit whole-degree value, for the >1° change comparison.
