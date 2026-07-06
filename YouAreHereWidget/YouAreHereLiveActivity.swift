@@ -22,6 +22,10 @@ struct YouAreHereLiveActivity: Widget {
                 .padding(.horizontal, 18)
                 .padding(.vertical, 14)
             }
+                // Once the app stops feeding updates (force-quit, or killed for
+                // memory), the system flips the activity stale at our staleDate;
+                // dim it so it reads as dormant. A tap still relaunches/resumes.
+                .opacity(staleDim(context))
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Theme.background)
                 .activityBackgroundTint(Theme.background)
@@ -32,15 +36,18 @@ struct YouAreHereLiveActivity: Widget {
             return DynamicIsland {
                 // Expanded
                 DynamicIslandExpandedRegion(.leading) {
-                    if let route = context.state.route {
-                        RouteShield(route: route, height: 26,
-                                    color: Theme.textColor(changed: context.state.roadChanged, base: Theme.secondary),
-                                    family: context.state.appFont)
-                            .padding(.leading, 4)
-                    } else {
-                        Image(systemName: "road.lanes")
-                            .foregroundColor(Theme.secondary)
+                    Group {
+                        if let route = context.state.route {
+                            RouteShield(route: route, height: 26,
+                                        color: Theme.textColor(changed: context.state.roadChanged, base: Theme.secondary),
+                                        family: context.state.appFont)
+                                .padding(.leading, 4)
+                        } else {
+                            Image(systemName: "road.lanes")
+                                .foregroundColor(Theme.secondary)
+                        }
                     }
+                    .opacity(staleDim(context))
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     HStack(spacing: 8) {
@@ -60,6 +67,7 @@ struct YouAreHereLiveActivity: Widget {
                                 .foregroundColor(Theme.textColor(changed: context.state.headingChanged, base: Theme.secondary))
                         }
                     }
+                    .opacity(staleDim(context))
                 }
                 DynamicIslandExpandedRegion(.center) {
                     Text(displayTown(context.state))
@@ -67,6 +75,7 @@ struct YouAreHereLiveActivity: Widget {
                         .foregroundColor(Theme.textColor(changed: context.state.townChanged, base: Theme.primary))
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
+                        .opacity(staleDim(context))
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     HStack(spacing: 6) {
@@ -77,26 +86,39 @@ struct YouAreHereLiveActivity: Widget {
                         Spacer()
                         pauseControl(isPaused: context.state.isPaused, size: 22)
                     }
+                    .opacity(staleDim(context))
                 }
             } compactLeading: {
-                if let route = context.state.route {
-                    RouteShield(route: route, height: 20, family: context.state.appFont)
-                } else {
-                    Image(systemName: "location.fill").foregroundColor(Theme.primary)
+                Group {
+                    if let route = context.state.route {
+                        RouteShield(route: route, height: 20, family: context.state.appFont)
+                    } else {
+                        Image(systemName: "location.fill").foregroundColor(Theme.primary)
+                    }
                 }
+                .opacity(staleDim(context))
             } compactTrailing: {
                 Text(shortTown(context.state))
                     .font(context.state.font(size: 14, weight: .bold))
                     .foregroundColor(Theme.textColor(changed: context.state.townChanged, base: Theme.primary))
                     .lineLimit(1)
                     .frame(maxWidth: 80)
+                    .opacity(staleDim(context))
             } minimal: {
                 CompassArrow(degrees: context.state.headingContinuous,
                              size: 16, color: Theme.primary)
+                    .opacity(staleDim(context))
             }
             .widgetURL(URL(string: "youarehere://open"))
             .keylineTint(Theme.primary)
         }
+    }
+
+    /// Opacity for a stale activity: the app has stopped feeding updates (it was
+    /// force-quit, or killed for memory), so the readout is frozen and old — dim
+    /// it so it reads as dormant rather than lingering as if it were still live.
+    private func staleDim(_ context: ActivityViewContext<LocationActivityAttributes>) -> Double {
+        context.isStale ? 0.4 : 1
     }
 
     /// The aesthetic backdrop, rendered statically — it refreshes whenever the

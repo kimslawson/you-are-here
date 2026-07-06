@@ -202,6 +202,15 @@ app alive to refresh the Live Activity even with the screen locked.
   Live Activity update *budget*; this cadence stays well inside it while still
   feeling live. Tune via `activityNumericInterval` in `LocationEngine.swift`.
   The `NSSupportsLiveActivitiesFrequentUpdates` Info.plist key is set.
+- **When the app stops updating** (force-quit, or killed for memory) the readout
+  freezes. iOS gives no reliable force-quit callback — and you *wouldn't* want to
+  end the activity on process death anyway, since a memory kill mid-drive is
+  exactly when the Lock-Screen readout should persist. Instead each update stamps
+  a ~30 s `staleDate`; when it lapses the system flips `context.isStale` (and
+  re-renders the activity in its own process, even though the app is gone), so we
+  dim the whole activity to read as dormant. A tap still relaunches/resumes.
+  Parked activities carry no `staleDate` (parking is a deliberate persistent
+  state), so a park-then-quit lingers un-dimmed until iOS retires it.
 
 ## ⚠️ Offline place naming — important
 
