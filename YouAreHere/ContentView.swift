@@ -394,7 +394,7 @@ struct SettingsView: View {
                     if customFlashColor {
                         ColorPicker("Flash color", selection: flashColorBinding, supportsOpacity: false)
                     }
-                    Text("Light mode inverts the readout's black/white/gray palette. Fields briefly flash when their value changes — white by default (black in light mode), or a color of your choosing.")
+                    Text("Fields briefly flash when their value changes.")
                         .font(.footnote)
                         .foregroundColor(.secondary)
                     Picker("Background", selection: $backgroundArt) {
@@ -418,7 +418,7 @@ struct SettingsView: View {
                             }
                         }
                     }
-                    Text("Purely aesthetic, dim backdrops behind the readout — also on the Live Activity and floating window (updating with the readout, about once a second). Streets sketches a tilted, slowly turning abstract of nearby roads. Topo draws real elevation contours around you, top-down. Both fetch from a third-party server (overpass-api.de / open-meteo.com), send your location, and appear in the app and floating window only — not the Live Activity. Procedural is Topo's offline twin: contour lines from on-device noise, no network, not real terrain (and the better pick in flat areas). Neon is a synthwave grid that scrolls at your actual driving speed; dark mode only. Slope charts your altitude over the drive so far (no network) — swipe it to rewind through the trip and the whole readout retraces with it; the floating window shows it live, and it's not on the Live Activity. Route is the same idea in 2-D: a map of the path you've driven, auto-fit to the view with a dot at your position — swipe to move the dot back along it, pinch to zoom (out to the whole route, no further). Both draw in the flash color.")
+                    Text("Streets (app-only) sketches a tilted, slowly turning abstract of nearby roads. Topo (app-only) draws real elevation contours around you. Procedural is imagined elevation contours. Neon (dark only) is a synthwave grid that mirrors your driving speed. Slope (app-only) charts your altitude over the drive so far (swipe to rewind). Route maps the path you've taken (swipe to rewind, pinch to zoom)")
                         .font(.footnote)
                         .foregroundColor(.secondary)
                 }
@@ -434,7 +434,7 @@ struct SettingsView: View {
                     .pickerStyle(.inline)
                     .labelsHidden()
                     .onChange(of: appFont) { _ in engine.reloadAppearance() }
-                    Text("Used across the app, the Live Activity, and the floating window. FS Millbank is a wayfinding face by Fontsmith; Overpass is an open-source take on U.S. highway signage lettering.")
+                    Text("FS Millbank is a wayfinding face by Fontsmith. Overpass is an open-source take on U.S. highway signage lettering.")
                         .font(.footnote)
                         .foregroundColor(.secondary)
                 }
@@ -442,7 +442,7 @@ struct SettingsView: View {
                     ForEach(Complication.allCases) { comp in
                         Toggle(comp.label, isOn: complicationBinding(comp))
                     }
-                    Text("Choose what the bottom line shows. With none selected it stays empty (the layout doesn't shift). Time shows the current clock; Temperature is fetched from Open-Meteo (sends your location, like the online lookups).")
+                    Text("Temperature is fetched from Open-Meteo")
                         .font(.footnote)
                         .foregroundColor(.secondary)
                 }
@@ -478,14 +478,14 @@ struct SettingsView: View {
                         .foregroundColor(.secondary)
                 }
                 Section("Route numbers") {
-                    Toggle("Look up online", isOn: $onlineRouteLookup)
-                    Text("When Apple labels a road only by its street name, look up its route number (e.g. ME-131) from OpenStreetMap. This sends your location to a third-party server (overpass-api.de) and needs a network connection. Off by default.")
+                    Toggle("Add route numbers", isOn: $onlineRouteLookup)
+                    Text("When Apple labels a road only by its street name, look up its route number (e.g. ME-131) from OpenStreetMap.")
                         .font(.footnote)
                         .foregroundColor(.secondary)
                 }
                 Section("Speed limit") {
                     Toggle("Show speed limit", isOn: $showSpeedLimit)
-                    Text("Show the posted speed limit from OpenStreetMap when available. Like route lookup, this sends your location to a third-party server (overpass-api.de) and needs a network connection — coverage is partial, especially on minor roads. Off by default.")
+                    Text("Show the posted speed limit from OpenStreetMap when available.")
                         .font(.footnote)
                         .foregroundColor(.secondary)
                 }
@@ -496,7 +496,7 @@ struct SettingsView: View {
                         Text("Large").tag(true)
                     }
                     .pickerStyle(.segmented)
-                    Text("When you leave the app, keep the readout in a floating window over other apps (Picture in Picture). Its play/pause button parks and resumes. Small is a slim strip; Large is taller with bigger, more legible type. Off by default.")
+                    Text("When you leave the app, keep the readout in a floating window over other apps. Use play/pause to suspend wayfinding while parking.")
                         .font(.footnote)
                         .foregroundColor(.secondary)
                 }
@@ -507,12 +507,12 @@ struct SettingsView: View {
                     } label: {
                         Label("Stop & clear the Lock Screen", systemImage: "stop.circle")
                     }
-                    Text("Your readout appears on the Lock Screen (a Live Activity) while You Are Here runs. That readout is separate from the app — it keeps going even if you swipe the app closed from the App Switcher. Park (the pause button) keeps it; only Stop clears it and turns everything off. From the Lock Screen, tap the readout to reopen the app, then Stop here.")
+                    Text("Your readout appears on the Lock Screen (a Live Activity) while You Are Here runs. That readout is separate from the app and keeps going even if you swipe the app closed from the App Switcher. To stop the app completely, tap stop and then swipe the app away.")
                         .font(.footnote)
                         .foregroundColor(.secondary)
                 }
                 Section {
-                    Text("Compass uses true north. Place names come from Apple Maps and need a network connection; compass and altitude work offline.")
+                    Text("<privacy policy link> <developer and version info>")
                         .font(.footnote)
                         .foregroundColor(.secondary)
                 }
@@ -544,9 +544,9 @@ struct SettingsView: View {
     private var refreshFootnote: String {
         switch RefreshRate(rawValue: refreshSeconds) ?? .s1 {
         case .s1, .s2:
-            return "Faster updates and full GPS accuracy — most responsive, most battery."
+            return "Faster updates and full GPS accuracy. Responsive and accurate."
         case .s5, .s10:
-            return "Slower updates ease off the GPS to save battery and heat. Altitude and town/road get a little coarser."
+            return "Slower updates save battery and heat. Coarser altitude and position."
         }
     }
 }
