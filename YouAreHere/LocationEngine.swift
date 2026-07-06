@@ -217,6 +217,7 @@ final class LocationEngine: NSObject, ObservableObject {
         isPaused = paused
 
         if paused {
+            track.markPause()           // mark the park on the Slope trail
             suspendSensors()
             pushFrozenState()           // freeze the readout, flip icon to play
         } else {

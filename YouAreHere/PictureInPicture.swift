@@ -111,10 +111,12 @@ final class PiPManager: NSObject, ObservableObject {
         guard enabled, controller != nil else { return }
 
         let large = UserDefaults.standard.bool(forKey: SettingsKey.pipLargeWindow)
-        // Snapshot the trail by value for the Slope backdrop — the render closure
-        // runs off the environment, so we can't reach the engine from inside it.
+        // Snapshot the trail by value for the Slope/Route backdrops — the render
+        // closure runs off the environment, so we can't reach the engine inside it.
         let samples = engine?.track.samples ?? []
-        let renderer = ImageRenderer(content: PiPFrameView(state: state, large: large, samples: samples))
+        let pausePoints = engine?.track.pausePoints ?? []
+        let renderer = ImageRenderer(content: PiPFrameView(state: state, large: large,
+                                                           samples: samples, pausePoints: pausePoints))
         renderer.scale = renderScale
         guard let image = renderer.cgImage,
               let pixelBuffer = Self.pixelBuffer(from: image),
@@ -218,9 +220,10 @@ private final class PiPPlaybackDelegate: NSObject, AVPictureInPictureSampleBuffe
 struct PiPFrameView: View {
     let state: LocationActivityAttributes.ContentState
     var large = false
-    /// The drive's trail, for the Slope backdrop. Passed by value because the
-    /// frame renders detached from the environment (see PiPManager.renderFrame).
+    /// The drive's trail, for the Slope/Route backdrops. Passed by value because
+    /// the frame renders detached from the environment (see PiPManager.renderFrame).
     var samples: [TrackSample] = []
+    var pausePoints: [Date] = []
 
     var body: some View {
         ZStack {
@@ -270,9 +273,12 @@ struct PiPFrameView: View {
                         phase: BackgroundArtRenderer.neonAutoPhase(at: Date()),
                         contrast: state.backgroundContrast)
                 case .slope:
-                    // Live playhead (no scrubbing in the floating window).
+                    // Live playhead (no scrubbing here); parked freezes it at the
+                    // last recording so the trace stops scrolling.
+                    let playhead = state.isPaused ? (samples.last?.date ?? Date()) : Date()
                     BackgroundArtRenderer.drawSlope(
-                        &ctx, size: size, samples: samples, playhead: Date(),
+                        &ctx, size: size, samples: samples, playhead: playhead,
+                        pausePoints: pausePoints,
                         metric: state.unitIsMetric, family: state.appFont,
                         contrast: state.backgroundContrast)
                 case .route:

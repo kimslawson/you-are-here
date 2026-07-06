@@ -252,6 +252,7 @@ enum BackgroundArtRenderer {
     /// we only draw.
     static func drawSlope(_ ctx: inout GraphicsContext, size: CGSize,
                           samples: [TrackSample], playhead: Date,
+                          pausePoints: [Date] = [],
                           metric: Bool, family: AppFont, contrast: Double) {
         let w = size.width, h = size.height
         // The dot sits just inside the right edge so it isn't clipped in half.
@@ -287,8 +288,22 @@ enum BackgroundArtRenderer {
                         .font(labelFont).foregroundColor(labelColor),
                      at: CGPoint(x: 5, y: gy), anchor: .leading)
         }
-        label(hi, at: max(y(hi), topPad * 0.7))
-        label(lo, at: min(y(lo), h - botPad * 0.7))
+        // Pin the extremes near the top/bottom edges so they straddle the
+        // centered Dynamic Island / notch (mid-height on the short edge in
+        // landscape) instead of colliding with it.
+        label(hi, at: h * 0.05)
+        label(lo, at: h * 0.95)
+
+        // Pause markers: a subtle dashed vertical line at each park on the trail.
+        for pause in pausePoints {
+            let px = anchorX - CGFloat(playhead.timeIntervalSince(pause)) * pps
+            guard px >= 0, px <= w else { continue }
+            var mark = Path()
+            mark.move(to: CGPoint(x: px, y: 0))
+            mark.addLine(to: CGPoint(x: px, y: h))
+            ctx.stroke(mark, with: .color(Theme.secondary.opacity(min(1, 0.28 * contrast))),
+                       style: StrokeStyle(lineWidth: 1, dash: [3, 4]))
+        }
 
         // The trace, up to the playhead. Only near-visible points join the path
         // (everything older is off the left edge anyway).

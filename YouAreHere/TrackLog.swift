@@ -10,6 +10,10 @@ import Foundation
 @MainActor
 final class TrackLog {
     private(set) var samples: [TrackSample] = []
+    /// Times the drive was parked, so Slope can mark each with a dashed line.
+    /// Recording stops while parked (the engine ticks only when live), so these
+    /// are the gaps in the trail.
+    private(set) var pausePoints: [Date] = []
 
     /// At most one point this often, so storage stays bounded regardless of the
     /// refresh rate (1 s ticks record roughly every 4th).
@@ -48,6 +52,17 @@ final class TrackLog {
             }
         }
         return found ?? samples.first
+    }
+
+    /// Note a park at the end of the trail (the last recorded moment), for the
+    /// Slope pause marker. Ignored before anything's been recorded.
+    func markPause() {
+        guard let last = samples.last else { return }
+        // Guard against duplicate marks for the same park.
+        if pausePoints.last == last.date { return }
+        pausePoints.append(last.date)
+        // Keep bounded alongside the samples.
+        if pausePoints.count > 512 { pausePoints.removeFirst(pausePoints.count - 512) }
     }
 
     var first: TrackSample? { samples.first }

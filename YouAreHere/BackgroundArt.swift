@@ -353,10 +353,16 @@ struct SlopeBackground: View {
     var body: some View {
         TimelineView(.periodic(from: .now, by: 0.5)) { timeline in
             Canvas { ctx, size in
+                // Parked: freeze the playhead at the last recording so the trace
+                // stops scrolling (recording is already stopped — no new samples).
+                let live = engine.isPaused
+                    ? (engine.track.samples.last?.date ?? timeline.date)
+                    : timeline.date
                 BackgroundArtRenderer.drawSlope(
                     &ctx, size: size,
                     samples: engine.track.samples,
-                    playhead: selected ?? timeline.date,
+                    playhead: selected ?? live,
+                    pausePoints: engine.track.pausePoints,
                     metric: engine.state.unitIsMetric,
                     family: engine.state.appFont,
                     contrast: contrast)
