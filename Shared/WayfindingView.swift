@@ -23,13 +23,13 @@ struct WayfindingView<Trailing: View>: View {
     /// the app passes a past timestamp while scrubbing the Slope trail so the
     /// time retraces along with the rest of the readout.
     var displayDate: Date? = nil
-    /// Route view only: drop the big town headline and instead push the road
-    /// line to the top edge and the metrics line to the bottom edge, freeing the
-    /// center for the route trace. Pairs with `townInline`.
+    /// Route view only: drop the big town headline and use a single uniformly
+    /// scaled top line (road · route · town) pinned to the top edge, with the
+    /// metrics line at the bottom edge — freeing the center for the route trace.
     var edgeAligned: Bool = false
-    /// Route view only: append the town to the road/route line (since the big
-    /// town headline is gone under `edgeAligned`).
-    var townInline: Bool = false
+    /// Route view only: a control on the trailing end of the top line (the
+    /// settings gear), mirroring `trailing` on the metrics line.
+    var topTrailing: AnyView? = nil
     /// Optional control pinned to the trailing end of the altitude/heading line
     /// (e.g. the park/resume button).
     @ViewBuilder var trailing: () -> Trailing
@@ -53,7 +53,7 @@ struct WayfindingView<Trailing: View>: View {
             // Road (+ town) at the top edge, metrics at the bottom, route in
             // between. Fills the height it's given so the Spacer can push them apart.
             VStack(alignment: alignment, spacing: 0) {
-                roadLine
+                routeTopLine
                 speedSignBelow
                 Spacer(minLength: 0)
                 metricsLine
@@ -99,16 +99,9 @@ struct WayfindingView<Trailing: View>: View {
                     .font(state.font(size: smallSize, weight: .medium))
                     .foregroundColor(Theme.textColor(changed: state.roadChanged, base: Theme.secondary))
             }
-            if townInline {
-                // Route view: town rides at the end of the road line.
-                SeparatorDot(size: smallSize)
-                Text(state.town.isEmpty ? state.townPlaceholder : state.town)
-                    .font(state.font(size: smallSize, weight: .medium))
-                    .foregroundColor(Theme.textColor(changed: state.townChanged, base: Theme.secondary))
-            }
             Spacer(minLength: smallSize * 0.5)
-            // Edge-aligned (Route) drops the sign onto its own row below, so the
-            // road/route/town text gets the full width — see `speedSignBelow`.
+            // Edge-aligned (Route) uses `routeTopLine` instead of this, and drops
+            // the sign onto its own row below — see `speedSignBelow`.
             if !edgeAligned,
                let limit = Formatting.speedLimitValue(kmh: state.speedLimitKmh, metric: state.unitIsMetric) {
                 // Scaled up, the sign keeps its unscaled height in layout and
@@ -124,6 +117,54 @@ struct WayfindingView<Trailing: View>: View {
         // Optical alignment: the small type's left sidebearing sits a touch
         // further out than the big town line's — tuck the road line in a bit.
         .padding(.leading, smallSize * 0.1)
+    }
+
+    // MARK: Route top line (road · route · town, one size, never truncated)
+
+    /// The Route view's top line: road, route shield + label, and town, all at a
+    /// single font size chosen (via ViewThatFits) so the whole row fits without
+    /// truncating any field, with the settings gear on the trailing end — the
+    /// mirror of the metrics line's pause control.
+    private var routeTopLine: some View {
+        HStack(spacing: smallSize * 0.5) {
+            ViewThatFits(in: .horizontal) {
+                ForEach([1.0, 0.9, 0.8, 0.72, 0.64, 0.56, 0.5, 0.44, 0.38, 0.32], id: \.self) { scale in
+                    topLineRow(size: smallSize * CGFloat(scale))
+                }
+            }
+            Spacer(minLength: smallSize * 0.4)
+            if let topTrailing { topTrailing }
+        }
+        .padding(.leading, smallSize * 0.1)
+    }
+
+    private func topLineRow(size: CGFloat) -> some View {
+        let routeColor = Theme.textColor(changed: state.roadChanged, base: Theme.secondary)
+        return HStack(spacing: size * 0.5) {
+            if let route = state.route {
+                if showSeparateRoad && !state.road.isEmpty {
+                    Text(state.road)
+                        .font(state.font(size: size, weight: .medium))
+                        .foregroundColor(routeColor)
+                    SeparatorDot(size: size)
+                }
+                RouteShield(route: route, height: size * 1.26, color: routeColor,
+                            family: state.appFont)
+                Text(Formatting.routeLabel(route))
+                    .font(state.font(size: size, weight: .semibold))
+                    .foregroundColor(routeColor)
+            } else {
+                Text(state.road.isEmpty ? "—" : state.road)
+                    .font(state.font(size: size, weight: .medium))
+                    .foregroundColor(routeColor)
+            }
+            SeparatorDot(size: size)
+            Text(state.town.isEmpty ? state.townPlaceholder : state.town)
+                .font(state.font(size: size, weight: .medium))
+                .foregroundColor(Theme.textColor(changed: state.townChanged, base: Theme.secondary))
+        }
+        .lineLimit(1)
+        .fixedSize(horizontal: true, vertical: false)   // measure/render at natural width
     }
 
     /// Route view: the speed-limit sign on its own row just below the top line,

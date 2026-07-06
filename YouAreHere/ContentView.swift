@@ -31,6 +31,9 @@ struct ContentView: View {
     var body: some View {
         GeometryReader { geo in
             let isPortrait = geo.size.height >= geo.size.width
+            // Route clears the center for the map: the top line hugs the top edge
+            // (with the gear inline on it) and metrics the bottom.
+            let routeLayout = BackgroundArt(rawValue: backgroundArt) == .route
             ZStack {
                 Theme.background.ignoresSafeArea()
 
@@ -57,9 +60,6 @@ struct ContentView: View {
                     // Live, or — while scrubbing a Slope/Route trail — the readout
                     // recorded at the playhead moment.
                     let scrub = scrubbedReadout()
-                    // Route clears the center for the map: road (+town) hugs the
-                    // top edge, metrics the bottom.
-                    let routeLayout = BackgroundArt(rawValue: backgroundArt) == .route
                     WayfindingView(state: scrub.state,
                                    townSize: townSize(for: geo.size),
                                    alignment: .leading,
@@ -67,7 +67,8 @@ struct ContentView: View {
                                    speedSignScale: isPortrait ? 2 : 1,
                                    displayDate: scrub.displayDate,
                                    edgeAligned: routeLayout,
-                                   townInline: routeLayout) {
+                                   // Route puts the gear inline on the top line.
+                                   topTrailing: routeLayout ? AnyView(inlineGear(size: geo.size)) : nil) {
                         Button {
                             engine.togglePause()
                         } label: {
@@ -81,8 +82,9 @@ struct ContentView: View {
                     .animation(.easeOut(duration: 0.25), value: engine.state)
                 }
 
-                // Settings gear, top-right.
-                let showGear = isPortrait || chromeVisible
+                // Settings gear, top-right. Route puts it inline on the top line
+                // instead (see inlineGear), so the overlay hides there.
+                let showGear = !routeLayout && (isPortrait || chromeVisible)
                 VStack {
                     HStack {
                         Spacer()
@@ -190,6 +192,19 @@ struct ContentView: View {
     private func townSize(for size: CGSize) -> CGFloat {
         // Scale the headline to the screen; clamp for sanity.
         min(max(size.width * 0.16, 44), 120)
+    }
+
+    /// The settings gear rendered inline on the Route view's top line (mirroring
+    /// the pause control on the metrics line). Sized to sit with the top-line text.
+    private func inlineGear(size: CGSize) -> some View {
+        Button {
+            showSettings = true
+        } label: {
+            Image(systemName: "gearshape")
+                .font(.system(size: townSize(for: size) * 0.30, weight: .semibold))
+                .foregroundColor(Theme.secondary.opacity(0.6))
+        }
+        .buttonStyle(.plain)
     }
 
     /// The readout to show: live, or — while scrubbing a Slope/Route trail — the
