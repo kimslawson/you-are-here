@@ -54,6 +54,7 @@ struct WayfindingView<Trailing: View>: View {
             // between. Fills the height it's given so the Spacer can push them apart.
             VStack(alignment: alignment, spacing: 0) {
                 roadLine
+                speedSignBelow
                 Spacer(minLength: 0)
                 metricsLine
             }
@@ -106,7 +107,10 @@ struct WayfindingView<Trailing: View>: View {
                     .foregroundColor(Theme.textColor(changed: state.townChanged, base: Theme.secondary))
             }
             Spacer(minLength: smallSize * 0.5)
-            if let limit = Formatting.speedLimitValue(kmh: state.speedLimitKmh, metric: state.unitIsMetric) {
+            // Edge-aligned (Route) drops the sign onto its own row below, so the
+            // road/route/town text gets the full width — see `speedSignBelow`.
+            if !edgeAligned,
+               let limit = Formatting.speedLimitValue(kmh: state.speedLimitKmh, metric: state.unitIsMetric) {
                 // Scaled up, the sign keeps its unscaled height in layout and
                 // spills below the road line (over the town line's trailing end).
                 SpeedLimitSign(value: limit, height: townSize * 0.5 * speedSignScale,
@@ -120,6 +124,22 @@ struct WayfindingView<Trailing: View>: View {
         // Optical alignment: the small type's left sidebearing sits a touch
         // further out than the big town line's — tuck the road line in a bit.
         .padding(.leading, smallSize * 0.1)
+    }
+
+    /// Route view: the speed-limit sign on its own row just below the top line,
+    /// pushed to the trailing edge, so the road/route/town text above keeps the
+    /// full width. Empty (no space) when there's no posted limit.
+    @ViewBuilder
+    private var speedSignBelow: some View {
+        if let limit = Formatting.speedLimitValue(kmh: state.speedLimitKmh, metric: state.unitIsMetric) {
+            HStack(spacing: 0) {
+                Spacer(minLength: 0)
+                SpeedLimitSign(value: limit, height: townSize * 0.5 * speedSignScale,
+                               color: Theme.textColor(changed: state.speedLimitChanged, base: Theme.secondary),
+                               family: state.appFont)
+            }
+            .padding(.top, smallSize * 0.35)
+        }
     }
 
     /// Width the scaled-up speed sign overflows into the town line. Reserved as

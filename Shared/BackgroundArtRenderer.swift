@@ -348,7 +348,7 @@ enum BackgroundArtRenderer {
     /// Zoom `1` fits the whole route; the app clamps its pinch to this floor so
     /// you can't zoom out past the full extent.
     static let routeMinZoom: CGFloat = 1
-    static let routeMaxZoom: CGFloat = 8
+    static let routeMaxZoom: CGFloat = 20
 
     /// A 2-D trace of the route driven so far, in the flash color, with a dot at
     /// the `playhead` position. The whole route auto-fits the view at `zoom` 1;
@@ -400,14 +400,29 @@ enum BackgroundArtRenderer {
         }
 
         let color = Theme.flash
+        let stroke = StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round)
         if pts.count >= 2 {
-            var path = Path()
+            // Split at the playhead: the part already driven at full intensity,
+            // the not-yet-reached part (only visible when scrubbing back) at half.
+            var traveled = Path(), ahead = Path()
+            var lastTraveled: CGPoint?
+            var aheadStarted = false
             for (i, p) in pts.enumerated() {
                 let sp = screen(p)
-                if i == 0 { path.move(to: sp) } else { path.addLine(to: sp) }
+                if located[i].date <= playhead {
+                    if traveled.isEmpty { traveled.move(to: sp) } else { traveled.addLine(to: sp) }
+                    lastTraveled = sp
+                } else if !aheadStarted {
+                    // Bridge from the last driven point so the two halves meet.
+                    if let l = lastTraveled { ahead.move(to: l); ahead.addLine(to: sp) }
+                    else { ahead.move(to: sp) }
+                    aheadStarted = true
+                } else {
+                    ahead.addLine(to: sp)
+                }
             }
-            ctx.stroke(path, with: .color(color.opacity(min(1, 0.55 * contrast))),
-                       style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+            ctx.stroke(ahead, with: .color(color.opacity(min(1, 0.275 * contrast))), style: stroke)
+            ctx.stroke(traveled, with: .color(color.opacity(min(1, 0.55 * contrast))), style: stroke)
         }
 
         // The "you are here" dot at the playhead.

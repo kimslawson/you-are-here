@@ -113,10 +113,12 @@ When the **town, road, or compass direction changes**, that field briefly
   - **Route** — the same trail as a 2-D map: the path you've driven
     (equirectangular projection of the recorded GPS coordinates), auto-fit to
     the view with a dot at your position. Swipe to move the dot back along the
-    path (the readout retraces, same as Slope); pinch to zoom, floored at the
-    whole-route extent (can't zoom out further) and following the dot as you
+    path (the readout retraces, same as Slope; the not-yet-reached part ahead of
+    the dot dims to half while you're back in time); pinch to zoom, floored at
+    the whole-route extent (can't zoom out further) and following the dot as you
     zoom in. In this view the layout reflows: the town is appended to the
-    road/route line, and the top and bottom lines hug the view edges to clear
+    road/route line, the speed-limit sign drops to its own row below (so the text
+    keeps the full width), and the top and bottom lines hug the view edges to clear
     the center for the map. Same App + PiP scope as Slope. Both Slope and Route
     draw in the flash color.
 - **Easter egg:** tap the app screen 10 times in quick succession and the whole
