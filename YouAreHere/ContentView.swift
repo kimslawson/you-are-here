@@ -27,6 +27,9 @@ struct ContentView: View {
     // committed at the last pinch's end (the base the live gesture multiplies).
     @State private var routeZoom: CGFloat = 1
     @State private var routeZoomBase: CGFloat = 1
+    // Set once the engine has started, so the "Stopped" screen only shows after
+    // an explicit Stop — not during the first frame before start() runs.
+    @State private var didStart = false
 
     var body: some View {
         GeometryReader { geo in
@@ -56,6 +59,8 @@ struct ContentView: View {
 
                 if needsPermission {
                     permissionPrompt
+                } else if didStart && !engine.isRunning {
+                    stoppedView
                 } else {
                     // Live, or — while scrubbing a Slope/Route trail — the readout
                     // recorded at the playhead moment.
@@ -115,11 +120,16 @@ struct ContentView: View {
             UIApplication.shared.isIdleTimerDisabled = !engine.isPaused
             engine.requestAuthorization()
             engine.start()
+            didStart = true
             pip.bind(to: engine)
             pip.setEnabled(pictureInPicture)
         }
         .onChange(of: engine.isPaused) { paused in
-            UIApplication.shared.isIdleTimerDisabled = !paused
+            UIApplication.shared.isIdleTimerDisabled = engine.isRunning && !paused
+        }
+        .onChange(of: engine.isRunning) { running in
+            // Stopped: let the screen sleep again.
+            UIApplication.shared.isIdleTimerDisabled = running && !engine.isPaused
         }
         .onChange(of: pictureInPicture) { enabled in
             pip.setEnabled(enabled)
@@ -303,6 +313,33 @@ struct ContentView: View {
         }
         .padding(32)
     }
+
+    /// Shown after an explicit Stop (Settings ▸ Stop). Confirms the Lock-Screen
+    /// readout is cleared, teaches that closing the app wouldn't have done that,
+    /// and offers a fresh Start.
+    private var stoppedView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "stop.circle")
+                .font(.system(size: 44))
+                .foregroundColor(Theme.muted)
+            Text("Stopped")
+                .font(engine.state.font(size: 22, weight: .bold))
+                .foregroundColor(Theme.primary)
+            Text("The Lock Screen readout is cleared. (Just closing the app leaves it running — this is how to fully stop.)")
+                .font(engine.state.font(size: 15, weight: .regular))
+                .foregroundColor(Theme.secondary)
+                .multilineTextAlignment(.center)
+            Button("Start") {
+                engine.start()
+            }
+            .font(engine.state.font(size: 16, weight: .semibold))
+            .foregroundColor(.black)
+            .padding(.horizontal, 24).padding(.vertical, 10)
+            .background(Theme.primary)
+            .clipShape(Capsule())
+        }
+        .padding(32)
+    }
 }
 
 struct SettingsView: View {
@@ -460,6 +497,17 @@ struct SettingsView: View {
                     }
                     .pickerStyle(.segmented)
                     Text("When you leave the app, keep the readout in a floating window over other apps (Picture in Picture). Its play/pause button parks and resumes. Small is a slim strip; Large is taller with bigger, more legible type. Off by default.")
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                }
+                Section("Stopping") {
+                    Button(role: .destructive) {
+                        engine.endSession()
+                        dismiss()
+                    } label: {
+                        Label("Stop & clear the Lock Screen", systemImage: "stop.circle")
+                    }
+                    Text("Your readout appears on the Lock Screen (a Live Activity) while You Are Here runs. That readout is separate from the app — it keeps going even if you swipe the app closed from the App Switcher. Park (the pause button) keeps it; only Stop clears it and turns everything off. From the Lock Screen, tap the readout to reopen the app, then Stop here.")
                         .font(.footnote)
                         .foregroundColor(.secondary)
                 }

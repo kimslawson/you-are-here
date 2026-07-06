@@ -198,6 +198,22 @@ final class LocationEngine: NSObject, ObservableObject {
         endLiveActivity()
     }
 
+    /// The true "off", distinct from Park: stop the sensors *and* clear the
+    /// Lock-Screen Live Activity immediately, so nothing lingers after the user
+    /// leaves. (Park deliberately keeps the glanceable activity alive; closing
+    /// the app doesn't remove it either — only this does.) A fresh Start, or a
+    /// cold launch, begins a new session.
+    func endSession() {
+        isPaused = false
+        if isRunning {
+            stop()                          // suspends sensors + ends the activity
+        } else if let shown = Activity<LocationActivityAttributes>.activities.first {
+            // Cold-launched with no running session: just end what's shown.
+            activity = shown
+            endLiveActivity()
+        }
+    }
+
     // MARK: Park / resume
 
     func togglePause() {

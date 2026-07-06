@@ -154,6 +154,18 @@ When the **town, road, or compass direction changes**, that field briefly
   The Live Activity button is interactive on iOS 17+ (via an App Intent that
   runs in the app process and relaunches it if needed); on iOS 16 it shows the
   state but tapping opens the app instead.
+- **Stop vs. Park (the real off switch).** A Live Activity is deliberately
+  decoupled from the app process — it keeps running on the Lock Screen even when
+  the app is backgrounded *or force-quit from the App Switcher*, which surprises
+  people who expect swipe-up to turn everything off. So the app draws a clear
+  line between two "offs": **Park** freezes the readout but keeps the glanceable
+  Lock-Screen activity; **Stop** (*Settings ▸ Stopping*) ends the activity
+  immediately (`endSession` → `Activity.end(.immediate)`) and powers the sensors
+  down, then the app shows a "Stopped" screen with a fresh **Start**. The
+  Settings copy and the Stopped screen both spell out that closing the app
+  doesn't clear the Lock-Screen readout — only Stop does. (See also the
+  stale-dim below: when the app stops feeding updates for any reason, the
+  activity dims to read as dormant.)
 - **Floating window (opt-in).** *Settings ▸ Floating window ▸ Float over other
   apps.* When you leave the app, the readout stays in a small Picture-in-Picture
   banner floating over other apps. A Small/Large toggle picks the banner
