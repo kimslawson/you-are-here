@@ -258,41 +258,47 @@ enum BackgroundArtRenderer {
         // The dot sits just inside the right edge so it isn't clipped in half.
         let inset = max(6, min(w, h) * 0.05)
         let anchorX = w - inset
-        let topPad = h * 0.16, botPad = h * 0.16
 
         let alts = samples.compactMap { $0.altitudeMeters }
         guard samples.count >= 2, let lo = alts.min(), let hi = alts.max() else { return }
-        let (yMin, yMax, step) = slopeAxis(lo: lo, hi: hi)
+
+        // Altitude band: the max line and min line pass through the real extremes
+        // (so the labels always match them). Centered and sized off the short
+        // side, so it fills a wide (landscape) view but stays gently un-stretched
+        // and well inset in a tall (portrait) one — clearing the rounded corners
+        // and the notch either way.
+        let band = min(w, h) * 0.70
+        let maxLineY = (h - band) / 2
+        let minLineY = (h + band) / 2
         func y(_ meters: Double) -> CGFloat {
-            let f = (meters - yMin) / max(1, yMax - yMin)
-            return h - botPad - CGFloat(f) * (h - topPad - botPad)
+            guard hi > lo else { return (maxLineY + minLineY) / 2 }
+            let f = (meters - lo) / (hi - lo)          // 0 at min, 1 at max
+            return minLineY - CGFloat(f) * (minLineY - maxLineY)
         }
         let pps = slopePointsPerSecond(width: w)
 
-        // Gridline ticks (screen-pinned; the trace pans behind them).
+        // The two reference lines through the extremes (screen-pinned; the trace
+        // pans behind them).
         var grid = Path()
-        var level = (yMin / step).rounded(.up) * step
-        while level <= yMax {
-            let gy = y(level)
-            grid.move(to: CGPoint(x: 0, y: gy))
-            grid.addLine(to: CGPoint(x: w, y: gy))
-            level += step
+        for ly in [maxLineY, minLineY] {
+            grid.move(to: CGPoint(x: 0, y: ly))
+            grid.addLine(to: CGPoint(x: w, y: ly))
         }
-        ctx.stroke(grid, with: .color(Theme.secondary.opacity(min(1, 0.14 * contrast))), lineWidth: 1)
+        ctx.stroke(grid, with: .color(Theme.secondary.opacity(min(1, 0.18 * contrast))), lineWidth: 1)
 
-        // Min / max labels, pinned to the left, nudged in from the edges.
+        // Min / max labels, sitting just outside their lines and inset from the
+        // left edge so the rounded corner doesn't clip them.
         let labelColor = Theme.secondary.opacity(min(1, 0.5 * contrast))
-        let labelFont = Theme.font(size: max(9, min(w, h) * 0.03), weight: .medium, family: family)
+        let labelSize = max(9, min(w, h) * 0.03)
+        let labelFont = Theme.font(size: labelSize, weight: .medium, family: family)
+        let labelX = max(12, min(w, h) * 0.045)
         func label(_ meters: Double, at gy: CGFloat) {
             ctx.draw(Text(Formatting.altitudeString(meters: meters, metric: metric))
                         .font(labelFont).foregroundColor(labelColor),
-                     at: CGPoint(x: 5, y: gy), anchor: .leading)
+                     at: CGPoint(x: labelX, y: gy), anchor: .leading)
         }
-        // Pin the extremes near the top/bottom edges so they straddle the
-        // centered Dynamic Island / notch (mid-height on the short edge in
-        // landscape) instead of colliding with it.
-        label(hi, at: h * 0.05)
-        label(lo, at: h * 0.95)
+        label(hi, at: maxLineY - labelSize * 0.8)
+        label(lo, at: minLineY + labelSize * 0.8)
 
         // Pause markers: a subtle dashed vertical line at each park on the trail.
         for pause in pausePoints {
@@ -342,20 +348,6 @@ enum BackgroundArtRenderer {
             if let a = s.altitudeMeters { return a }
         }
         return nil
-    }
-
-    /// A padded altitude window and a "nice" gridline step (meters) from the
-    /// session's real min/max, so ticks land on round-ish values and the range
-    /// grows as new extremes arrive.
-    private static func slopeAxis(lo: Double, hi: Double) -> (yMin: Double, yMax: Double, step: Double) {
-        let span = max(hi - lo, 1)
-        let pad = span * 0.12
-        let yMin = lo - pad, yMax = hi + pad
-        let raw = (yMax - yMin) / 4                    // aim for ~4 gridlines
-        let mag = pow(10, floor(log10(max(raw, 1))))
-        let norm = raw / mag
-        let niceNorm: Double = norm < 1.5 ? 1 : (norm < 3 ? 2 : (norm < 7 ? 5 : 10))
-        return (yMin, yMax, niceNorm * mag)
     }
 
     // MARK: Route
