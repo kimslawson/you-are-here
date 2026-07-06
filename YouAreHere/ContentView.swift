@@ -519,6 +519,18 @@ struct SettingsView: View {
             }
             .navigationTitle("You Are Here")
             .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    // Convenience Stop, since the full "Stopping" section is at the
+                    // very bottom. Same action as that section's button.
+                    Button(role: .destructive) {
+                        engine.endSession()
+                        dismiss()
+                    } label: {
+                        Label("Stop", systemImage: "stop.circle")
+                            .labelStyle(.titleAndIcon)
+                    }
+                    .tint(.red)
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
                 }
