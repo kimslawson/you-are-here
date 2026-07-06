@@ -344,25 +344,53 @@ struct NeonBackground: View {
 /// big dot, earlier terrain trailing off to the left. `selected` (from
 /// ContentView's pan gesture) moves the playhead into the past; nil tracks the
 /// live "now". Redraws on a slow timeline so the live trace keeps advancing.
+/// Remembers the last axis extremes (and when they last changed) across redraws,
+/// so the label for a just-changed min/max can flash. A reference type mutated
+/// inside the Canvas closure — the ProceduralBackground cache pattern.
+private final class SlopeAxisState {
+    var lastMin: Double?
+    var lastMax: Double?
+    var minFlashUntil = Date.distantPast
+    var maxFlashUntil = Date.distantPast
+}
+
 struct SlopeBackground: View {
     @EnvironmentObject private var engine: LocationEngine
     @AppStorage(SettingsKey.backgroundContrast) private var contrast = 1.0
     /// nil = live (playhead follows now); a date = scrubbed into the past.
     var selected: Date?
+    @State private var axis = SlopeAxisState()
+
+    /// How long a min/max label stays flashed after the graph rescales.
+    private let flashDuration: TimeInterval = 1.2
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 0.5)) { timeline in
             Canvas { ctx, size in
+                let samples = engine.track.samples
+                let now = timeline.date
+
+                // Flash the label whose extreme just changed (the graph rescaled).
+                let alts = samples.compactMap { $0.altitudeMeters }
+                if let lo = alts.min(), let hi = alts.max() {
+                    if let last = axis.lastMin, lo != last { axis.minFlashUntil = now.addingTimeInterval(flashDuration) }
+                    if let last = axis.lastMax, hi != last { axis.maxFlashUntil = now.addingTimeInterval(flashDuration) }
+                    axis.lastMin = lo
+                    axis.lastMax = hi
+                }
+
                 // Parked: freeze the playhead at the last recording so the trace
                 // stops scrolling (recording is already stopped — no new samples).
                 let live = engine.isPaused
-                    ? (engine.track.samples.last?.date ?? timeline.date)
-                    : timeline.date
+                    ? (samples.last?.date ?? now)
+                    : now
                 BackgroundArtRenderer.drawSlope(
                     &ctx, size: size,
-                    samples: engine.track.samples,
+                    samples: samples,
                     playhead: selected ?? live,
                     pausePoints: engine.track.pausePoints,
+                    minLabelFlash: now < axis.minFlashUntil,
+                    maxLabelFlash: now < axis.maxFlashUntil,
                     metric: engine.state.unitIsMetric,
                     family: engine.state.appFont,
                     contrast: contrast)

@@ -253,6 +253,7 @@ enum BackgroundArtRenderer {
     static func drawSlope(_ ctx: inout GraphicsContext, size: CGSize,
                           samples: [TrackSample], playhead: Date,
                           pausePoints: [Date] = [],
+                          minLabelFlash: Bool = false, maxLabelFlash: Bool = false,
                           metric: Bool, family: AppFont, contrast: Double) {
         let w = size.width, h = size.height
         // The dot sits just inside the right edge so it isn't clipped in half.
@@ -286,19 +287,35 @@ enum BackgroundArtRenderer {
         }
         ctx.stroke(grid, with: .color(Theme.secondary.opacity(min(1, 0.18 * contrast))), lineWidth: 1)
 
+        // Sea level: once the trace has dipped below zero, keep a thin dashed
+        // line pinned at altitude 0 (it rides the y-mapping as the range rescales).
+        if lo < 0 {
+            let zeroY = y(0)
+            if zeroY >= 0, zeroY <= h {
+                var zero = Path()
+                zero.move(to: CGPoint(x: 0, y: zeroY))
+                zero.addLine(to: CGPoint(x: w, y: zeroY))
+                ctx.stroke(zero, with: .color(Theme.secondary.opacity(min(1, 0.3 * contrast))),
+                           style: StrokeStyle(lineWidth: 1, dash: [3, 4]))
+            }
+        }
+
         // Min / max labels, sitting just outside their lines and inset from the
-        // left edge so the rounded corner doesn't clip them.
-        let labelColor = Theme.secondary.opacity(min(1, 0.5 * contrast))
+        // left edge so the rounded corner doesn't clip them. A label flashes (in
+        // the flash color) on the frames right after its value changed — i.e. the
+        // graph just rescaled around a new extreme.
+        let dimLabel = Theme.secondary.opacity(min(1, 0.5 * contrast))
+        let flashLabel = Theme.flash.opacity(min(1, 0.9 * contrast))
         let labelSize = max(9, min(w, h) * 0.03)
         let labelFont = Theme.font(size: labelSize, weight: .medium, family: family)
         let labelX = max(12, min(w, h) * 0.045)
-        func label(_ meters: Double, at gy: CGFloat) {
+        func label(_ meters: Double, at gy: CGFloat, color: Color) {
             ctx.draw(Text(Formatting.altitudeString(meters: meters, metric: metric))
-                        .font(labelFont).foregroundColor(labelColor),
+                        .font(labelFont).foregroundColor(color),
                      at: CGPoint(x: labelX, y: gy), anchor: .leading)
         }
-        label(hi, at: maxLineY - labelSize * 0.8)
-        label(lo, at: minLineY + labelSize * 0.8)
+        label(hi, at: maxLineY - labelSize * 0.8, color: maxLabelFlash ? flashLabel : dimLabel)
+        label(lo, at: minLineY + labelSize * 0.8, color: minLabelFlash ? flashLabel : dimLabel)
 
         // Pause markers: a subtle dashed vertical line at each park on the trail.
         for pause in pausePoints {
