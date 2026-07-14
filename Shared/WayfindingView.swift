@@ -369,9 +369,11 @@ extension WayfindingView where Trailing == EmptyView {
          townSize: CGFloat = 64,
          alignment: HorizontalAlignment = .leading,
          speedSignScale: CGFloat = 1,
-         smallScale: CGFloat = 1) {
+         smallScale: CGFloat = 1,
+         edgeAligned: Bool = false) {
         self.init(state: state, townSize: townSize, alignment: alignment,
                   speedSignScale: speedSignScale, smallScale: smallScale,
+                  edgeAligned: edgeAligned,
                   trailing: { EmptyView() })
     }
 }

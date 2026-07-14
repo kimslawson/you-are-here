@@ -226,6 +226,11 @@ struct PiPFrameView: View {
     var pausePoints: [Date] = []
 
     var body: some View {
+        // Route gets a square window (the map wastes no width on a north–south
+        // drive; the system pinch resizes it); everything else keeps the wide
+        // banner. Route also uses the edge-aligned layout so the map owns the
+        // center, same as the app screen.
+        let route = BackgroundArt(rawValue: state.backgroundID) == .route
         ZStack {
             Theme.background
             backdrop
@@ -233,11 +238,13 @@ struct PiPFrameView: View {
             // at strip size the small type is what goes illegible first.
             WayfindingView(state: state, townSize: large ? 84 : 50,
                            alignment: .leading, speedSignScale: 2,
-                           smallScale: large ? 1 : 1.25)
+                           smallScale: large ? 1 : 1.25,
+                           edgeAligned: route)
                 .padding(.horizontal, large ? 30 : 22)
-                .padding(.vertical, large ? 18 : 14)
+                .padding(.vertical, route ? (large ? 24 : 16) : (large ? 18 : 14))
         }
-        .frame(width: 480, height: large ? 240 : 160)
+        .frame(width: route ? (large ? 480 : 320) : 480,
+               height: route ? (large ? 480 : 320) : (large ? 240 : 160))
     }
 
     /// The aesthetic backdrop, static per frame (frames regenerate ~1/s while
