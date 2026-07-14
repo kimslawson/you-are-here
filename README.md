@@ -138,9 +138,9 @@ When the **town, road, or compass direction changes**, that field briefly
 - **Easter egg:** tap the app screen 10 times in quick succession and the whole
   UI switches to Comic Sans (well, Comic Neue — iOS doesn't ship the real
   thing). Ten more taps restore whatever font you had before.
-- **Settings gear:** always visible in portrait. In landscape it shares the
-  top-right corner with the speed-limit sign, so it auto-hides — tap anywhere
-  to reveal it for a few seconds.
+- **Control bezel:** no persistent chrome — tap anywhere to summon a
+  bottom-center pill with **Settings / Share / Routes** (icon + title each);
+  it fades back out after a few seconds.
 - **Complications (bottom line):** *Settings ▸ Complications* — pick any subset
   of **Altitude**, **Compass**, **Time**, **Temperature** (dot-separated, in
   that order). With none selected the row is empty but keeps its height, so the

@@ -12,8 +12,8 @@ struct ContentView: View {
     @AppStorage(SettingsKey.backgroundArt) private var backgroundArt = BackgroundArt.off.rawValue
     @StateObject private var pip = PiPManager()
     @State private var showSettings = false
-    /// Landscape-only: the gear is hidden until a tap reveals it (it shares the
-    /// top-right corner with the speed-limit sign there). Portrait always shows it.
+    /// The control bezel (Settings / Share / Routes) is hidden until a tap
+    /// anywhere summons it; it fades back out after a few seconds.
     @State private var chromeVisible = false
     @State private var chromeHideTask: Task<Void, Never>?
     // Easter egg: 10 quick taps swap to Comic; 10 more swap back.
@@ -84,9 +84,7 @@ struct ContentView: View {
                                    // Portrait is cramped; double the speed sign.
                                    speedSignScale: isPortrait ? 2 : 1,
                                    displayDate: scrub.displayDate,
-                                   edgeAligned: routeLayout,
-                                   // Route puts the gear inline on the top line.
-                                   topTrailing: routeLayout ? AnyView(inlineGear(size: geo.size)) : nil) {
+                                   edgeAligned: routeLayout) {
                         HStack(spacing: townSize(for: geo.size) * 0.16) {
                             // Scrubbed into the past, it's easy to stop just shy
                             // of "now" and think the graph is stuck — surface a
@@ -120,27 +118,29 @@ struct ContentView: View {
                     .animation(.easeOut(duration: 0.25), value: engine.state)
                 }
 
-                // Top-right chrome: share + routes list (+ the gear, except in
-                // Route view where it rides inline on the top line).
-                let showChrome = isPortrait || chromeVisible
-                VStack {
-                    HStack(spacing: 0) {
+                // Control bezel: tap anywhere to summon Settings / Share /
+                // Routes, bottom-center where thumbs live; it fades out after a
+                // few seconds. No persistent chrome — the readout owns the screen.
+                if chromeVisible {
+                    VStack {
                         Spacer()
-                        chromeButton("square.and.arrow.up", label: "Share") { showShareOptions = true }
-                        chromeButton("list.bullet", label: "Routes") { showRoutes = true }
-                        if !routeLayout {
-                            chromeButton("gearshape", label: "Settings") { showSettings = true }
+                        HStack(alignment: .top, spacing: 26) {
+                            bezelControl("Settings", icon: "gearshape") { showSettings = true }
+                            bezelControl("Share", icon: "square.and.arrow.up") { showShareOptions = true }
+                            bezelControl("Routes", icon: "list.bullet") { showRoutes = true }
                         }
+                        .padding(.horizontal, 26)
+                        .padding(.vertical, 12)
+                        .background(.ultraThinMaterial,
+                                    in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                        .padding(.bottom, 16)
                     }
-                    .padding(.trailing, 4)
-                    .opacity(showChrome ? 1 : 0)
-                    .allowsHitTesting(showChrome)
-                    Spacer()
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
                 }
             }
             .contentShape(Rectangle())
             .onTapGesture {
-                if !isPortrait { revealChrome() }
+                revealChrome()
                 registerEggTap()
             }
             .gesture(scrubDrag(width: geo.size.width))
@@ -233,7 +233,7 @@ struct ContentView: View {
         engine.authorization == .denied || engine.authorization == .restricted
     }
 
-    /// Show the auto-hiding chrome (landscape gear) and re-arm its fade-out.
+    /// Show the auto-hiding control bezel and re-arm its fade-out.
     private func revealChrome() {
         withAnimation(.easeIn(duration: 0.15)) { chromeVisible = true }
         chromeHideTask?.cancel()
@@ -249,15 +249,19 @@ struct ContentView: View {
         min(max(size.width * 0.16, 44), 120)
     }
 
-    /// One top-right chrome icon (share / routes / settings).
-    private func chromeButton(_ icon: String, label: String, action: @escaping () -> Void) -> some View {
+    /// One bezel control: icon over a small text title.
+    private func bezelControl(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: icon)
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundColor(Theme.secondary.opacity(0.6))
-                .padding(12)
+            VStack(spacing: 5) {
+                Image(systemName: icon)
+                    .font(.system(size: 22, weight: .medium))
+                Text(title)
+                    .font(.system(size: 11, weight: .medium))
+            }
+            .foregroundColor(Theme.primary.opacity(0.85))
+            .frame(minWidth: 54)
         }
-        .accessibilityLabel(label)
+        .buttonStyle(.plain)
     }
 
     /// Rasterize the current screen — backdrop plus readout, honoring any
@@ -291,19 +295,6 @@ struct ContentView: View {
         playback = TrackLog(saved: route)
         slopeSelected = nil
         slopeDragAnchor = nil
-    }
-
-    /// The settings gear rendered inline on the Route view's top line (mirroring
-    /// the pause control on the metrics line). Sized to sit with the top-line text.
-    private func inlineGear(size: CGSize) -> some View {
-        Button {
-            showSettings = true
-        } label: {
-            Image(systemName: "gearshape")
-                .font(.system(size: townSize(for: size) * 0.30, weight: .semibold))
-                .foregroundColor(Theme.secondary.opacity(0.6))
-        }
-        .buttonStyle(.plain)
     }
 
     /// The readout to show: live, or — while scrubbing a Slope/Route trail — the

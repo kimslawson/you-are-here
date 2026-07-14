@@ -27,9 +27,6 @@ struct WayfindingView<Trailing: View>: View {
     /// scaled top line (road · route · town) pinned to the top edge, with the
     /// metrics line at the bottom edge — freeing the center for the route trace.
     var edgeAligned: Bool = false
-    /// Route view only: a control on the trailing end of the top line (the
-    /// settings gear), mirroring `trailing` on the metrics line.
-    var topTrailing: AnyView? = nil
     /// Optional control pinned to the trailing end of the altitude/heading line
     /// (e.g. the park/resume button).
     @ViewBuilder var trailing: () -> Trailing
@@ -123,8 +120,7 @@ struct WayfindingView<Trailing: View>: View {
 
     /// The Route view's top line: road, route shield + label, and town, all at a
     /// single font size chosen (via ViewThatFits) so the whole row fits without
-    /// truncating any field, with the settings gear on the trailing end — the
-    /// mirror of the metrics line's pause control.
+    /// truncating any field.
     private var routeTopLine: some View {
         HStack(spacing: smallSize * 0.5) {
             ViewThatFits(in: .horizontal) {
@@ -132,8 +128,7 @@ struct WayfindingView<Trailing: View>: View {
                     topLineRow(size: smallSize * CGFloat(scale))
                 }
             }
-            Spacer(minLength: smallSize * 0.4)
-            if let topTrailing { topTrailing }
+            Spacer(minLength: 0)
         }
         .padding(.leading, smallSize * 0.1)
     }
