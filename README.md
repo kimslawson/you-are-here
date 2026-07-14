@@ -104,17 +104,23 @@ When the **town, road, or compass direction changes**, that field briefly
     axis auto-fits the session's real min/max with faint gridline ticks and
     min/max labels pinned to the left. Fed by an in-app trail (`TrackLog` records
     the readout each tick; `TrackSample` in Shared); no network, session-scoped
-    (a cold launch starts fresh, capped ~12 h). In the app you can **swipe to
-    scrub** the playhead back through the whole trip — the entire readout (town,
-    road/route, altitude, heading, temperature, and the time complication)
-    retraces with it; swipe back to snap to live. App + PiP only (the trail lives
-    in the app process, and it's too big for the Live Activity's state budget);
-    the floating window shows it live, un-scrubbed.
+    (a cold launch starts fresh, capped ~12 h). The trail's time axis is
+    **active time**: parking closes a recording segment and freezes the clock,
+    resuming opens the next — paused wall-clock time never appears on the axis,
+    segments sit back-to-back separated by the dashed seam line, and their
+    traces are never connected. In the app you can **swipe to scrub** the
+    playhead back through the whole trip — the entire readout (town, road/route,
+    altitude, heading, temperature, and the time complication) retraces with it;
+    swipe back to snap to live. App + PiP only (the trail lives in the app
+    process, and it's too big for the Live Activity's state budget); the
+    floating window shows it live, un-scrubbed.
   - **Route** — the same trail as a 2-D map: the path you've driven
     (equirectangular projection of the recorded GPS coordinates), auto-fit to
-    the view with a dot at your position. Swipe to move the dot back along the
-    path (the readout retraces, same as Slope; the not-yet-reached part ahead of
-    the dot dims to half while you're back in time); pinch to zoom, floored at
+    the view with a dot at your position; recording segments (see Slope) draw
+    as separate strokes, never joined across a park. Swipe to move the dot back
+    along the path (the readout retraces, same as Slope; the not-yet-reached
+    part ahead of the dot dims to half while you're back in time); pinch to
+    zoom, floored at
     the whole-route extent (can't zoom out further) and following the dot as you
     zoom in. In this view the layout reflows: the town is appended to the
     road/route line, the speed-limit sign drops to its own row below (so the text

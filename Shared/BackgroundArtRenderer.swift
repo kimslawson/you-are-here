@@ -243,16 +243,17 @@ enum BackgroundArtRenderer {
         width / CGFloat(slopeWindowSeconds)
     }
 
-    /// An altitude sparkline of the drive so far. The right edge is a "playhead":
-    /// the sample at `playhead` sits there with a big dot on its altitude, and
-    /// earlier samples trail left, off-screen. The altitude axis auto-fits the
-    /// session's real min/max; faint gridline ticks and the min/max labels stay
-    /// pinned to the left while the trace pans behind them. Panning the playhead
-    /// into the past is the app's job — it hands us the chosen `playhead`; here
-    /// we only draw.
+    /// An altitude sparkline of the drive so far, on the trail's *active-time*
+    /// axis (paused time excised — see TrackLog). The right edge is a
+    /// "playhead": the sample at `playhead` sits there with a big dot on its
+    /// altitude, and earlier samples trail left, off-screen. Segments (parks)
+    /// draw as separate strokes with a dashed seam between them. The altitude
+    /// axis auto-fits the session's real min/max; the reference lines and
+    /// min/max labels stay pinned while the trace pans behind them. Panning the
+    /// playhead into the past is the app's job — here we only draw.
     static func drawSlope(_ ctx: inout GraphicsContext, size: CGSize,
-                          samples: [TrackSample], playhead: Date,
-                          pausePoints: [Date] = [],
+                          samples: [TrackSample], playhead: TimeInterval,
+                          pauseMarks: [TimeInterval] = [],
                           minLabelFlash: Bool = false, maxLabelFlash: Bool = false,
                           metric: Bool, family: AppFont, contrast: Double) {
         let w = size.width, h = size.height
@@ -317,34 +318,42 @@ enum BackgroundArtRenderer {
         label(hi, at: maxLineY - labelSize * 0.8, color: maxLabelFlash ? flashLabel : dimLabel)
         label(lo, at: minLineY + labelSize * 0.8, color: minLabelFlash ? flashLabel : dimLabel)
 
-        // Pause markers: a subtle dashed vertical line at each park on the trail.
-        for pause in pausePoints {
-            let px = anchorX - CGFloat(playhead.timeIntervalSince(pause)) * pps
+        // Segment seams: a subtle dashed vertical line at each park.
+        for mark in pauseMarks {
+            let px = anchorX - CGFloat(playhead - mark) * pps
             guard px >= 0, px <= w else { continue }
-            var mark = Path()
-            mark.move(to: CGPoint(x: px, y: 0))
-            mark.addLine(to: CGPoint(x: px, y: h))
-            ctx.stroke(mark, with: .color(Theme.secondary.opacity(min(1, 0.28 * contrast))),
+            var seam = Path()
+            seam.move(to: CGPoint(x: px, y: 0))
+            seam.addLine(to: CGPoint(x: px, y: h))
+            ctx.stroke(seam, with: .color(Theme.secondary.opacity(min(1, 0.28 * contrast))),
                        style: StrokeStyle(lineWidth: 1, dash: [3, 4]))
         }
 
-        // The trace, up to the playhead. Only near-visible points join the path
-        // (everything older is off the left edge anyway).
-        let leftCutoff = playhead.addingTimeInterval(-Double((anchorX + 24) / pps))
+        // The trace, up to the playhead, broken at segment seams (a park ends
+        // one stroke; the resume starts the next — never connected). Only
+        // near-visible points join the path.
+        let leftCutoff = playhead - Double((anchorX + 24) / pps)
         var line = Path()
         var started = false
+        var lastSegment: Int?
         for s in samples {
-            if s.date < leftCutoff { continue }
-            if s.date > playhead { break }        // samples are time-sorted
+            if s.activeTime < leftCutoff { continue }
+            if s.activeTime > playhead { break }   // samples are time-sorted
             guard let a = s.altitudeMeters else { continue }
-            let p = CGPoint(x: anchorX - CGFloat(playhead.timeIntervalSince(s.date)) * pps, y: y(a))
-            if started { line.addLine(to: p) } else { line.move(to: p); started = true }
+            let p = CGPoint(x: anchorX - CGFloat(playhead - s.activeTime) * pps, y: y(a))
+            if started && lastSegment == s.segment {
+                line.addLine(to: p)
+            } else {
+                line.move(to: p)
+                started = true
+            }
+            lastSegment = s.segment
         }
 
         // The trace and dot draw in the flash color (the trail is the "live"
         // element here); gridlines and labels stay dim.
         let traceColor = Theme.flash.opacity(min(1, 0.55 * contrast))
-        guard let headAlt = slopeAltitude(at: playhead, samples: samples) else {
+        guard let headAlt = slopeAltitude(atActive: playhead, samples: samples) else {
             ctx.stroke(line, with: .color(traceColor), lineWidth: 1.6)
             return
         }
@@ -359,9 +368,9 @@ enum BackgroundArtRenderer {
                  with: .color(Theme.flash.opacity(min(1, 0.85 * contrast))))
     }
 
-    /// The recorded altitude at or before `date` (last non-nil), for the dot.
-    private static func slopeAltitude(at date: Date, samples: [TrackSample]) -> Double? {
-        for s in samples.reversed() where s.date <= date {
+    /// The recorded altitude at or before `t` on the active axis (last non-nil).
+    private static func slopeAltitude(atActive t: TimeInterval, samples: [TrackSample]) -> Double? {
+        for s in samples.reversed() where s.activeTime <= t {
             if let a = s.altitudeMeters { return a }
         }
         return nil
@@ -375,11 +384,13 @@ enum BackgroundArtRenderer {
     static let routeMaxZoom: CGFloat = 20
 
     /// A 2-D trace of the route driven so far, in the flash color, with a dot at
-    /// the `playhead` position. The whole route auto-fits the view at `zoom` 1;
-    /// pinching in (zoom > 1) magnifies toward the dot. Panning the playhead
-    /// along the path is the app's job — it hands us `playhead`; here we draw.
+    /// the `playhead` position (active-time axis — see TrackLog). Segments
+    /// (parks) draw as separate strokes, never connected. The whole route
+    /// auto-fits the view at `zoom` 1; pinching in (zoom > 1) magnifies toward
+    /// the dot. Panning the playhead along the path is the app's job — it hands
+    /// us `playhead`; here we draw.
     static func drawRoute(_ ctx: inout GraphicsContext, size: CGSize,
-                          samples: [TrackSample], playhead: Date,
+                          samples: [TrackSample], playhead: TimeInterval,
                           zoom: CGFloat, contrast: Double) {
         let w = size.width, h = size.height
         let located = samples.filter { $0.latitude != nil && $0.longitude != nil }
@@ -426,24 +437,40 @@ enum BackgroundArtRenderer {
         let color = Theme.flash
         let stroke = StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round)
         if pts.count >= 2 {
-            // Split at the playhead: the part already driven at full intensity,
-            // the not-yet-reached part (only visible when scrubbing back) at half.
+            // Split at the playhead — the part already driven at full intensity,
+            // the not-yet-reached part (only visible when scrubbing back) at
+            // half — and at segment seams: parked gaps draw as separate strokes,
+            // never connected.
             var traveled = Path(), ahead = Path()
-            var lastTraveled: CGPoint?
-            var aheadStarted = false
+            var lastPoint: CGPoint?
+            var lastSegment: Int?
+            var lastWasTraveled = false
             for (i, p) in pts.enumerated() {
                 let sp = screen(p)
-                if located[i].date <= playhead {
-                    if traveled.isEmpty { traveled.move(to: sp) } else { traveled.addLine(to: sp) }
-                    lastTraveled = sp
-                } else if !aheadStarted {
-                    // Bridge from the last driven point so the two halves meet.
-                    if let l = lastTraveled { ahead.move(to: l); ahead.addLine(to: sp) }
-                    else { ahead.move(to: sp) }
-                    aheadStarted = true
+                let s = located[i]
+                let sameSegment = s.segment == lastSegment
+                if s.activeTime <= playhead {
+                    if sameSegment, lastPoint != nil {
+                        traveled.addLine(to: sp)
+                    } else {
+                        traveled.move(to: sp)
+                    }
+                    lastWasTraveled = true
                 } else {
-                    ahead.addLine(to: sp)
+                    if sameSegment, let lastPoint, lastWasTraveled {
+                        // Bridge from the last driven point so the halves meet
+                        // (within a segment only).
+                        ahead.move(to: lastPoint)
+                        ahead.addLine(to: sp)
+                    } else if sameSegment, lastPoint != nil {
+                        ahead.addLine(to: sp)
+                    } else {
+                        ahead.move(to: sp)
+                    }
+                    lastWasTraveled = false
                 }
+                lastPoint = sp
+                lastSegment = s.segment
             }
             ctx.stroke(ahead, with: .color(color.opacity(min(1, 0.275 * contrast))), style: stroke)
             ctx.stroke(traveled, with: .color(color.opacity(min(1, 0.55 * contrast))), style: stroke)
@@ -456,12 +483,12 @@ enum BackgroundArtRenderer {
                  with: .color(color.opacity(min(1, 0.9 * contrast))))
     }
 
-    /// The projected route point at or before `playhead` (the last located
-    /// sample not after it), for the dot.
-    private static func routeHead(playhead: Date, located: [TrackSample],
+    /// The projected route point at or before `playhead` on the active axis
+    /// (the last located sample not after it), for the dot.
+    private static func routeHead(playhead: TimeInterval, located: [TrackSample],
                                   project: (TrackSample) -> CGPoint) -> CGPoint? {
         var chosen: TrackSample?
-        for s in located where s.date <= playhead { chosen = s }
+        for s in located where s.activeTime <= playhead { chosen = s }
         return (chosen ?? located.first).map(project)
     }
 }

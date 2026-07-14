@@ -114,9 +114,11 @@ final class PiPManager: NSObject, ObservableObject {
         // Snapshot the trail by value for the Slope/Route backdrops — the render
         // closure runs off the environment, so we can't reach the engine inside it.
         let samples = engine?.track.samples ?? []
-        let pausePoints = engine?.track.pausePoints ?? []
+        let pauseMarks = engine?.track.pauseMarks ?? []
+        let playhead = engine?.track.activeDuration ?? 0
         let renderer = ImageRenderer(content: PiPFrameView(state: state, large: large,
-                                                           samples: samples, pausePoints: pausePoints))
+                                                           samples: samples, pauseMarks: pauseMarks,
+                                                           playhead: playhead))
         renderer.scale = renderScale
         guard let image = renderer.cgImage,
               let pixelBuffer = Self.pixelBuffer(from: image),
@@ -223,7 +225,9 @@ struct PiPFrameView: View {
     /// The drive's trail, for the Slope/Route backdrops. Passed by value because
     /// the frame renders detached from the environment (see PiPManager.renderFrame).
     var samples: [TrackSample] = []
-    var pausePoints: [Date] = []
+    var pauseMarks: [TimeInterval] = []
+    /// Live playhead on the active-time axis (frozen while parked).
+    var playhead: TimeInterval = 0
 
     var body: some View {
         // Route gets a square window (the map wastes no width on a north–south
@@ -280,18 +284,17 @@ struct PiPFrameView: View {
                         phase: BackgroundArtRenderer.neonAutoPhase(at: Date()),
                         contrast: state.backgroundContrast)
                 case .slope:
-                    // Live playhead (no scrubbing here); parked freezes it at the
-                    // last recording so the trace stops scrolling.
-                    let playhead = state.isPaused ? (samples.last?.date ?? Date()) : Date()
+                    // Live playhead (no scrubbing here); the active clock
+                    // freezes itself while parked.
                     BackgroundArtRenderer.drawSlope(
                         &ctx, size: size, samples: samples, playhead: playhead,
-                        pausePoints: pausePoints,
+                        pauseMarks: pauseMarks,
                         metric: state.unitIsMetric, family: state.appFont,
                         contrast: state.backgroundContrast)
                 case .route:
                     // Live, fit-to-view (no scrub or pinch in the floating window).
                     BackgroundArtRenderer.drawRoute(
-                        &ctx, size: size, samples: samples, playhead: Date(),
+                        &ctx, size: size, samples: samples, playhead: playhead,
                         zoom: 1, contrast: state.backgroundContrast)
                 default:
                     break

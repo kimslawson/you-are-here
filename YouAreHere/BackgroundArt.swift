@@ -8,9 +8,9 @@ import CoreLocation
 /// render the same scenes statically.
 struct BackgroundArtView: View {
     let kind: BackgroundArt
-    /// Slope / Route only: the scrubbed playhead time (nil = live), owned by
-    /// ContentView where the pan gesture lives.
-    var slopeSelected: Date?
+    /// Slope / Route only: the scrubbed playhead on the trail's active-time
+    /// axis (nil = live), owned by ContentView where the pan gesture lives.
+    var slopeSelected: TimeInterval?
     /// Route only: pinch-zoom factor (1 = whole route fit to view).
     var routeZoom: CGFloat = 1
 
@@ -357,8 +357,9 @@ private final class SlopeAxisState {
 struct SlopeBackground: View {
     @EnvironmentObject private var engine: LocationEngine
     @AppStorage(SettingsKey.backgroundContrast) private var contrast = 1.0
-    /// nil = live (playhead follows now); a date = scrubbed into the past.
-    var selected: Date?
+    /// nil = live (playhead follows the active clock, which freezes itself
+    /// while parked); a value = scrubbed into the past.
+    var selected: TimeInterval?
     @State private var axis = SlopeAxisState()
 
     /// How long a min/max label stays flashed after the graph rescales.
@@ -379,16 +380,11 @@ struct SlopeBackground: View {
                     axis.lastMax = hi
                 }
 
-                // Parked: freeze the playhead at the last recording so the trace
-                // stops scrolling (recording is already stopped — no new samples).
-                let live = engine.isPaused
-                    ? (samples.last?.date ?? now)
-                    : now
                 BackgroundArtRenderer.drawSlope(
                     &ctx, size: size,
                     samples: samples,
-                    playhead: selected ?? live,
-                    pausePoints: engine.track.pausePoints,
+                    playhead: selected ?? engine.track.activeDuration,
+                    pauseMarks: engine.track.pauseMarks,
                     minLabelFlash: now < axis.minFlashUntil,
                     maxLabelFlash: now < axis.maxFlashUntil,
                     metric: engine.state.unitIsMetric,
@@ -410,16 +406,17 @@ struct SlopeBackground: View {
 struct RouteBackground: View {
     @EnvironmentObject private var engine: LocationEngine
     @AppStorage(SettingsKey.backgroundContrast) private var contrast = 1.0
-    var selected: Date?
+    /// Playhead on the active-time axis; nil = live.
+    var selected: TimeInterval?
     var zoom: CGFloat = 1
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 0.5)) { timeline in
+        TimelineView(.periodic(from: .now, by: 0.5)) { _ in
             Canvas { ctx, size in
                 BackgroundArtRenderer.drawRoute(
                     &ctx, size: size,
                     samples: engine.track.samples,
-                    playhead: selected ?? timeline.date,
+                    playhead: selected ?? engine.track.activeDuration,
                     zoom: zoom,
                     contrast: contrast)
             }

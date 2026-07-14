@@ -19,10 +19,11 @@ struct ContentView: View {
     // Easter egg: 10 quick taps swap to Comic; 10 more swap back.
     @State private var eggTaps = 0
     @State private var lastEggTap = Date.distantPast
-    // Slope / Route backgrounds: the scrubbed playhead time (nil = live), plus
-    // the drag's anchor captured at gesture start. Meaningful only for those two.
-    @State private var slopeSelected: Date?
-    @State private var slopeDragAnchor: Date?
+    // Slope / Route backgrounds: the scrubbed playhead on the trail's
+    // active-time axis (nil = live), plus the drag's anchor captured at gesture
+    // start. Meaningful only for those two.
+    @State private var slopeSelected: TimeInterval?
+    @State private var slopeDragAnchor: TimeInterval?
     // Route background: pinch-zoom factor (1 = whole route fit), and the value
     // committed at the last pinch's end (the base the live gesture multiplies).
     @State private var routeZoom: CGFloat = 1
@@ -224,7 +225,7 @@ struct ContentView: View {
         let art = BackgroundArt(rawValue: backgroundArt)
         guard art == .slope || art == .route,
               let selected = slopeSelected,
-              let sample = engine.track.sample(at: selected) else {
+              let sample = engine.track.sample(atActive: selected) else {
             return (engine.state, nil)
         }
         var s = engine.state
@@ -256,14 +257,14 @@ struct ContentView: View {
                 guard art == .slope || art == .route, engine.track.isScrubable else { return }
                 let pps = BackgroundArtRenderer.slopePointsPerSecond(width: width)
                 guard pps > 0 else { return }
-                if slopeDragAnchor == nil { slopeDragAnchor = slopeSelected ?? Date() }
-                // Drag right (positive width) reveals earlier time.
+                if slopeDragAnchor == nil { slopeDragAnchor = slopeSelected ?? engine.track.activeDuration }
+                // Drag right (positive width) reveals earlier time. The axis is
+                // active time, so a park's dead time is a seam, not a span.
                 let deltaSeconds = Double(value.translation.width / pps)
-                let target = slopeDragAnchor!.addingTimeInterval(-deltaSeconds)
-                let earliest = engine.track.first?.date ?? Date()
-                let clamped = min(max(target, earliest), Date())
+                let target = slopeDragAnchor! - deltaSeconds
+                let clamped = min(max(target, 0), engine.track.activeDuration)
                 // Within a second of now: snap back to live tracking.
-                slopeSelected = Date().timeIntervalSince(clamped) < 1 ? nil : clamped
+                slopeSelected = engine.track.activeDuration - clamped < 1 ? nil : clamped
             }
             .onEnded { _ in slopeDragAnchor = nil }
     }
