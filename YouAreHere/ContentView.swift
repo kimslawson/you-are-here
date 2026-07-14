@@ -75,12 +75,30 @@ struct ContentView: View {
                                    edgeAligned: routeLayout,
                                    // Route puts the gear inline on the top line.
                                    topTrailing: routeLayout ? AnyView(inlineGear(size: geo.size)) : nil) {
-                        Button {
-                            engine.togglePause()
-                        } label: {
-                            PauseGlyph(isPaused: engine.isPaused, size: townSize(for: geo.size) * 0.32)
+                        HStack(spacing: townSize(for: geo.size) * 0.16) {
+                            // Scrubbed into the past, it's easy to stop just shy
+                            // of "now" and think the graph is stuck — surface a
+                            // one-tap way back to the present. Only shown while
+                            // scrubbed, so it doubles as the "not live" indicator.
+                            if slopeSelected != nil {
+                                Button {
+                                    slopeSelected = nil
+                                    slopeDragAnchor = nil
+                                } label: {
+                                    Image(systemName: "arrow.uturn.forward.circle.fill")
+                                        .font(.system(size: townSize(for: geo.size) * 0.32))
+                                        .foregroundColor(Theme.primary)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Back to now")
+                            }
+                            Button {
+                                engine.togglePause()
+                            } label: {
+                                PauseGlyph(isPaused: engine.isPaused, size: townSize(for: geo.size) * 0.32)
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                     }
                     .padding(.horizontal, 28)
                     .padding(.vertical, routeLayout ? 12 : 0)
