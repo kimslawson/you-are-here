@@ -218,8 +218,10 @@ struct WayfindingView<Trailing: View>: View {
     //
     // The whole complications block scales as ONE unit (ViewThatFits picks the
     // largest candidate scale that fits), so every value shares a single font
-    // size and nothing ever truncates — rather than each value shrinking
-    // independently.
+    // size and nothing ever truncates. Each candidate is *measured* against
+    // widest-template strings (every digit an "8", two-letter cardinal,
+    // two-digit hour) rather than the live values, so the chosen scale holds
+    // steady while values tick once a second instead of re-zooming per update.
     private var metricsLine: some View {
         HStack(spacing: smallSize * 0.6) {
             ViewThatFits(in: .horizontal) {
@@ -239,27 +241,37 @@ struct WayfindingView<Trailing: View>: View {
 
     private func complicationsRow(scale: CGFloat) -> some View {
         let size = smallSize * scale
+        // The invisible sizing row fixes the footprint; the live row renders on
+        // top, leading-aligned, always at or under the template width.
+        return ZStack(alignment: .leading) {
+            rowContent(size: size, sizing: true).opacity(0)
+            rowContent(size: size, sizing: false)
+        }
+        .fixedSize(horizontal: true, vertical: false)   // measure/render at natural width
+    }
+
+    private func rowContent(size: CGFloat, sizing: Bool) -> some View {
         let comps = Complication.decode(state.complications)
         return HStack(spacing: size * 0.7) {
             ForEach(Array(comps.enumerated()), id: \.offset) { index, comp in
                 if index > 0 { SeparatorDot(size: size) }
-                complication(comp, size: size)
+                complication(comp, size: size, sizing: sizing)
             }
         }
         .lineLimit(1)
-        .fixedSize(horizontal: true, vertical: false)   // measure/render at natural width
+        .fixedSize(horizontal: true, vertical: false)
     }
 
     @ViewBuilder
-    private func complication(_ c: Complication, size: CGFloat) -> some View {
+    private func complication(_ c: Complication, size: CGFloat, sizing: Bool) -> some View {
         switch c {
         case .altitude:
             // Altitude and compass keep their icons; time and temperature are
             // text-only to leave room and stay uniform.
+            let text = Formatting.altitudeString(meters: state.altitudeMeters,
+                                                 metric: state.unitIsMetric)
             Label {
-                complicationText(Formatting.altitudeString(meters: state.altitudeMeters,
-                                                           metric: state.unitIsMetric),
-                                 color: Theme.secondary, size: size)
+                complicationText(sizing ? eights(text) : text, color: Theme.secondary, size: size)
             } icon: {
                 Image(systemName: "mountain.2.fill")
                     .font(.system(size: size * 0.85))
@@ -268,20 +280,31 @@ struct WayfindingView<Trailing: View>: View {
         case .compass:
             let color = Theme.textColor(changed: state.headingChanged, base: Theme.secondary)
             Label {
-                complicationText(Formatting.headingString(state.headingDegrees), color: color, size: size)
+                complicationText(sizing ? (state.headingDegrees == nil ? "—" : "WW 888°")
+                                        : Formatting.headingString(state.headingDegrees),
+                                 color: color, size: size)
             } icon: {
                 CompassArrow(degrees: state.headingContinuous, size: size * 0.85, color: color)
             }
         case .time:
-            complicationText(Formatting.timeString(displayDate ?? Date(), clock24: state.clock24),
+            complicationText(sizing ? (state.clock24 ? "88:88" : "88:88 PM")
+                                    : Formatting.timeString(displayDate ?? Date(), clock24: state.clock24),
                              color: Theme.textColor(changed: state.timeChanged, base: Theme.secondary),
                              size: size)
         case .temperature:
-            complicationText(Formatting.temperatureString(celsius: state.temperatureC,
-                                                          metric: state.unitIsCelsius),
+            let text = Formatting.temperatureString(celsius: state.temperatureC,
+                                                    metric: state.unitIsCelsius)
+            complicationText(sizing ? eights(text) : text,
                              color: Theme.textColor(changed: state.temperatureChanged, base: Theme.secondary),
                              size: size)
         }
+    }
+
+    /// Digits → "8" (typically the widest digit), so a template keeps a value's
+    /// width stable while the value ticks. Width still moves when the digit
+    /// *count* changes (999 → 1,000 ft) — a real rescale, and rare.
+    private func eights(_ s: String) -> String {
+        String(s.map { $0.isNumber ? "8" : $0 })
     }
 
     private func complicationText(_ text: String, color: Color, size: CGFloat) -> some View {
