@@ -31,6 +31,17 @@ struct ContentView: View {
     // Set once the engine has started, so the "Stopped" screen only shows after
     // an explicit Stop — not during the first frame before start() runs.
     @State private var didStart = false
+    // Playback: a saved route loaded from the Routes list. While set, the
+    // Slope/Route backgrounds, scrubbing, and the retraced readout all use it
+    // instead of the live trail; the snap-to-present control exits back to live.
+    @State private var playback: TrackLog?
+    @State private var showRoutes = false
+    @State private var showShareOptions = false
+    @State private var shareItem: ShareItem?
+
+    /// The trail everything trail-driven reads: the playback route if one is
+    /// loaded, else the live recording.
+    private var activeTrack: TrackLog { playback ?? engine.track }
 
     var body: some View {
         GeometryReader { geo in
@@ -47,7 +58,8 @@ struct ContentView: View {
                 if !needsPermission,
                    let art = BackgroundArt(rawValue: backgroundArt), art != .off,
                    !(art == .neon && engine.state.lightMode) {
-                    BackgroundArtView(kind: art, slopeSelected: slopeSelected, routeZoom: routeZoom)
+                    BackgroundArtView(kind: art, track: activeTrack,
+                                      slopeSelected: slopeSelected, routeZoom: routeZoom)
                 }
 
                 // Offscreen-ish host for the PiP video layer (must be in the
@@ -79,11 +91,13 @@ struct ContentView: View {
                             // Scrubbed into the past, it's easy to stop just shy
                             // of "now" and think the graph is stuck — surface a
                             // one-tap way back to the present. Only shown while
-                            // scrubbed, so it doubles as the "not live" indicator.
-                            if slopeSelected != nil {
+                            // scrubbed (or playing back a saved route), so it
+                            // doubles as the "not live" indicator.
+                            if slopeSelected != nil || playback != nil {
                                 Button {
                                     slopeSelected = nil
                                     slopeDragAnchor = nil
+                                    playback = nil
                                 } label: {
                                     Image(systemName: "arrow.uturn.forward.circle.fill")
                                         .font(.system(size: townSize(for: geo.size) * 0.32))
@@ -106,23 +120,21 @@ struct ContentView: View {
                     .animation(.easeOut(duration: 0.25), value: engine.state)
                 }
 
-                // Settings gear, top-right. Route puts it inline on the top line
-                // instead (see inlineGear), so the overlay hides there.
-                let showGear = !routeLayout && (isPortrait || chromeVisible)
+                // Top-right chrome: share + routes list (+ the gear, except in
+                // Route view where it rides inline on the top line).
+                let showChrome = isPortrait || chromeVisible
                 VStack {
-                    HStack {
+                    HStack(spacing: 0) {
                         Spacer()
-                        Button {
-                            showSettings = true
-                        } label: {
-                            Image(systemName: "gearshape")
-                                .font(.system(size: 20, weight: .semibold))
-                                .foregroundColor(Theme.secondary.opacity(0.6))
-                                .padding(16)
+                        chromeButton("square.and.arrow.up", label: "Share") { showShareOptions = true }
+                        chromeButton("list.bullet", label: "Routes") { showRoutes = true }
+                        if !routeLayout {
+                            chromeButton("gearshape", label: "Settings") { showSettings = true }
                         }
-                        .opacity(showGear ? 1 : 0)
-                        .allowsHitTesting(showGear)
                     }
+                    .padding(.trailing, 4)
+                    .opacity(showChrome ? 1 : 0)
+                    .allowsHitTesting(showChrome)
                     Spacer()
                 }
             }
@@ -133,6 +145,10 @@ struct ContentView: View {
             }
             .gesture(scrubDrag(width: geo.size.width))
             .simultaneousGesture(routePinch())
+            .confirmationDialog("Share", isPresented: $showShareOptions, titleVisibility: .visible) {
+                Button("Current view as image") { shareImage(size: geo.size) }
+                Button("Route data (JSON)") { shareJSON() }
+            }
         }
         .onAppear {
             // Keep awake on the dash while live; allow sleep when parked.
@@ -170,6 +186,9 @@ struct ContentView: View {
             // button): the full app is showing, so the floating window is
             // redundant — dismiss it.
             if phase == .active { pip.dismissForForeground() }
+            // Leaving: persist the drive so it shows in the Routes list even if
+            // the process never comes back.
+            if phase == .background { engine.saveTrack() }
         }
         .onDisappear {
             UIApplication.shared.isIdleTimerDisabled = false
@@ -178,6 +197,13 @@ struct ContentView: View {
             SettingsView()
                 .environmentObject(engine)
                 .preferredColorScheme(engine.state.lightMode ? .light : .dark)
+        }
+        .sheet(isPresented: $showRoutes) {
+            RoutesListView { route in startPlayback(route) }
+                .preferredColorScheme(engine.state.lightMode ? .light : .dark)
+        }
+        .sheet(item: $shareItem) { item in
+            ActivityView(items: item.items)
         }
     }
 
@@ -223,6 +249,50 @@ struct ContentView: View {
         min(max(size.width * 0.16, 44), 120)
     }
 
+    /// One top-right chrome icon (share / routes / settings).
+    private func chromeButton(_ icon: String, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundColor(Theme.secondary.opacity(0.6))
+                .padding(12)
+        }
+        .accessibilityLabel(label)
+    }
+
+    /// Rasterize the current screen — backdrop plus readout, honoring any
+    /// scrub/zoom — and hand it to the share sheet.
+    private func shareImage(size: CGSize) {
+        let scrub = scrubbedReadout()
+        let snapshot = ShareSnapshotView(
+            state: scrub.state, displayDate: scrub.displayDate, size: size,
+            samples: activeTrack.samples, pauseMarks: activeTrack.pauseMarks,
+            playhead: slopeSelected ?? activeTrack.activeDuration, zoom: routeZoom)
+        let renderer = ImageRenderer(content: snapshot)
+        renderer.scale = 3
+        guard let image = renderer.uiImage else { return }
+        shareItem = ShareItem(items: [image])
+    }
+
+    /// Export the displayed trail (live, or the playback route) as a JSON file.
+    private func shareJSON() {
+        guard let url = RouteStore.shared.exportURL(for: activeTrack) else { return }
+        shareItem = ShareItem(items: [url])
+    }
+
+    /// Load a saved route for playback: trail-driven views switch to it, and if
+    /// a non-trail background is active, hop to Route so there's something to
+    /// see. The snap-to-present control exits back to live.
+    private func startPlayback(_ route: SavedRoute) {
+        if let art = BackgroundArt(rawValue: backgroundArt), art != .slope, art != .route {
+            backgroundArt = BackgroundArt.route.rawValue
+            engine.reloadAppearance()
+        }
+        playback = TrackLog(saved: route)
+        slopeSelected = nil
+        slopeDragAnchor = nil
+    }
+
     /// The settings gear rendered inline on the Route view's top line (mirroring
     /// the pause control on the metrics line). Sized to sit with the top-line text.
     private func inlineGear(size: CGSize) -> some View {
@@ -241,9 +311,11 @@ struct ContentView: View {
     /// flashes) suppressed and the time complication pinned to that moment.
     private func scrubbedReadout() -> (state: LocationActivityAttributes.ContentState, displayDate: Date?) {
         let art = BackgroundArt(rawValue: backgroundArt)
+        // During playback the readout retraces even un-scrubbed (playhead sits
+        // at the recording's end); live, only an actual scrub retraces.
         guard art == .slope || art == .route,
-              let selected = slopeSelected,
-              let sample = engine.track.sample(atActive: selected) else {
+              slopeSelected != nil || playback != nil,
+              let sample = activeTrack.sample(atActive: slopeSelected ?? activeTrack.activeDuration) else {
             return (engine.state, nil)
         }
         var s = engine.state
@@ -272,17 +344,18 @@ struct ContentView: View {
         DragGesture(minimumDistance: 10)
             .onChanged { value in
                 let art = BackgroundArt(rawValue: backgroundArt)
-                guard art == .slope || art == .route, engine.track.isScrubable else { return }
+                guard art == .slope || art == .route, activeTrack.isScrubable else { return }
                 let pps = BackgroundArtRenderer.slopePointsPerSecond(width: width)
                 guard pps > 0 else { return }
-                if slopeDragAnchor == nil { slopeDragAnchor = slopeSelected ?? engine.track.activeDuration }
+                if slopeDragAnchor == nil { slopeDragAnchor = slopeSelected ?? activeTrack.activeDuration }
                 // Drag right (positive width) reveals earlier time. The axis is
                 // active time, so a park's dead time is a seam, not a span.
                 let deltaSeconds = Double(value.translation.width / pps)
                 let target = slopeDragAnchor! - deltaSeconds
-                let clamped = min(max(target, 0), engine.track.activeDuration)
-                // Within a second of now: snap back to live tracking.
-                slopeSelected = engine.track.activeDuration - clamped < 1 ? nil : clamped
+                let clamped = min(max(target, 0), activeTrack.activeDuration)
+                // Within a second of the end: back to nil — live tracking, or
+                // (in playback) resting at the recording's end.
+                slopeSelected = activeTrack.activeDuration - clamped < 1 ? nil : clamped
             }
             .onEnded { _ in slopeDragAnchor = nil }
     }

@@ -33,6 +33,18 @@ final class TrackLog {
     /// first recording.
     private let maxSamples = 10_800
 
+    init() {}
+
+    /// Rehydrate a saved route for playback: the active clock stays frozen at
+    /// the end of the recording (segmentStart nil), so activeDuration is its
+    /// total length and nothing new is ever recorded into it.
+    init(saved: SavedRoute) {
+        samples = saved.samples
+        pauseMarks = saved.pauseMarks
+        activeOffset = saved.samples.last?.activeTime ?? 0
+        currentSegment = (saved.samples.last?.segment ?? 0) + 1
+    }
+
     /// Where "now" sits on the active axis: frozen while parked, advancing with
     /// the wall clock while recording. The live playhead.
     var activeDuration: TimeInterval {

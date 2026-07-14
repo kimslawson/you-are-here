@@ -127,6 +127,14 @@ When the **town, road, or compass direction changes**, that field briefly
     keeps the full width), and the top and bottom lines hug the view edges to clear
     the center for the map. Same App + PiP scope as Slope. Both Slope and Route
     draw in the flash color.
+- **Share & saved routes.** Drives are saved automatically (Documents/Routes,
+  one JSON file per session, written at natural boundaries — park, stop, app
+  background; `RouteStore`). The **share** control offers the current view as
+  an image (the screen re-rendered off-screen at 3×, honoring any scrub/zoom)
+  or the trail as parseable JSON (ISO-8601 dates; same schema as the saved
+  files). The **routes list** shows recent drives — tap to play one back
+  (Slope/Route scrub through it exactly like the live trail; the
+  snap-to-present control exits to live), swipe left to delete.
 - **Easter egg:** tap the app screen 10 times in quick succession and the whole
   UI switches to Comic Sans (well, Comic Neue — iOS doesn't ship the real
   thing). Ten more taps restore whatever font you had before.

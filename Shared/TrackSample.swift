@@ -5,9 +5,10 @@ import Foundation
 /// app's scrub gesture uses the rest (town, road, route, heading, temperature)
 /// to retrace the readout at any past point on the trail.
 ///
-/// Value type with no protocol conformances by design — it's captured by value
-/// into the floating-window render closure, so there's nothing to synchronize.
-struct TrackSample {
+/// A value type — it's captured by value into the floating-window render
+/// closure, so there's nothing to synchronize. Codable so whole trails can be
+/// saved to disk (RouteStore) and exported as parseable JSON.
+struct TrackSample: Codable {
     var date: Date
     var altitudeMeters: Double?
     /// GPS position, for the Route background's 2-D path. nil when no fix.

@@ -205,6 +205,8 @@ final class LocationEngine: NSObject, ObservableObject {
     /// cold launch, begins a new session.
     func endSession() {
         isPaused = false
+        track.markPause()                   // close the trail's open segment
+        saveTrack()
         if isRunning {
             stop()                          // suspends sensors + ends the activity
         } else if let shown = Activity<LocationActivityAttributes>.activities.first {
@@ -212,6 +214,13 @@ final class LocationEngine: NSObject, ObservableObject {
             activity = shown
             endLiveActivity()
         }
+    }
+
+    /// Persist the session's trail (Documents/Routes, one file per session,
+    /// re-saved in place). Called at natural boundaries — park, stop, app
+    /// background — so recent drives survive for the Routes list.
+    func saveTrack() {
+        RouteStore.shared.save(track)
     }
 
     // MARK: Park / resume
@@ -233,7 +242,8 @@ final class LocationEngine: NSObject, ObservableObject {
         isPaused = paused
 
         if paused {
-            track.markPause()           // mark the park on the Slope trail
+            track.markPause()           // close the segment on the trail
+            saveTrack()                 // parks are natural save points
             suspendSensors()
             pushFrozenState()           // freeze the readout, flip icon to play
         } else {

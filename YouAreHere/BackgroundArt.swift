@@ -8,6 +8,9 @@ import CoreLocation
 /// render the same scenes statically.
 struct BackgroundArtView: View {
     let kind: BackgroundArt
+    /// The trail Slope/Route draw: the live recording, or a saved route during
+    /// playback. Owned by ContentView.
+    var track: TrackLog
     /// Slope / Route only: the scrubbed playhead on the trail's active-time
     /// axis (nil = live), owned by ContentView where the pan gesture lives.
     var slopeSelected: TimeInterval?
@@ -21,8 +24,8 @@ struct BackgroundArtView: View {
         case .topo:       TopoBackground()
         case .procedural: ProceduralBackground()
         case .neon:       NeonBackground()
-        case .slope:      SlopeBackground(selected: slopeSelected)
-        case .route:      RouteBackground(selected: slopeSelected, zoom: routeZoom)
+        case .slope:      SlopeBackground(track: track, selected: slopeSelected)
+        case .route:      RouteBackground(track: track, selected: slopeSelected, zoom: routeZoom)
         }
     }
 }
@@ -357,6 +360,8 @@ private final class SlopeAxisState {
 struct SlopeBackground: View {
     @EnvironmentObject private var engine: LocationEngine
     @AppStorage(SettingsKey.backgroundContrast) private var contrast = 1.0
+    /// The trail to draw (live recording, or a saved route in playback).
+    var track: TrackLog
     /// nil = live (playhead follows the active clock, which freezes itself
     /// while parked); a value = scrubbed into the past.
     var selected: TimeInterval?
@@ -368,7 +373,7 @@ struct SlopeBackground: View {
     var body: some View {
         TimelineView(.periodic(from: .now, by: 0.5)) { timeline in
             Canvas { ctx, size in
-                let samples = engine.track.samples
+                let samples = track.samples
                 let now = timeline.date
 
                 // Flash the label whose extreme just changed (the graph rescaled).
@@ -383,8 +388,8 @@ struct SlopeBackground: View {
                 BackgroundArtRenderer.drawSlope(
                     &ctx, size: size,
                     samples: samples,
-                    playhead: selected ?? engine.track.activeDuration,
-                    pauseMarks: engine.track.pauseMarks,
+                    playhead: selected ?? track.activeDuration,
+                    pauseMarks: track.pauseMarks,
                     minLabelFlash: now < axis.minFlashUntil,
                     maxLabelFlash: now < axis.maxFlashUntil,
                     metric: engine.state.unitIsMetric,
@@ -404,8 +409,9 @@ struct SlopeBackground: View {
 /// dot back along the path; `zoom` (from the pinch gesture) magnifies toward it.
 /// nil `selected` tracks live "now".
 struct RouteBackground: View {
-    @EnvironmentObject private var engine: LocationEngine
     @AppStorage(SettingsKey.backgroundContrast) private var contrast = 1.0
+    /// The trail to draw (live recording, or a saved route in playback).
+    var track: TrackLog
     /// Playhead on the active-time axis; nil = live.
     var selected: TimeInterval?
     var zoom: CGFloat = 1
@@ -415,8 +421,8 @@ struct RouteBackground: View {
             Canvas { ctx, size in
                 BackgroundArtRenderer.drawRoute(
                     &ctx, size: size,
-                    samples: engine.track.samples,
-                    playhead: selected ?? engine.track.activeDuration,
+                    samples: track.samples,
+                    playhead: selected ?? track.activeDuration,
                     zoom: zoom,
                     contrast: contrast)
             }
