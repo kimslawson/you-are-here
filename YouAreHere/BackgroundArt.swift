@@ -417,8 +417,13 @@ struct RouteBackground: View {
     var zoom: CGFloat = 1
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 0.5)) { _ in
+        TimelineView(.periodic(from: .now, by: 0.5)) { timeline in
             Canvas { ctx, size in
+                // Capture the schedule's date: SwiftUI diffs the canvas by its
+                // closure's captured values, and without this nothing captured
+                // changes between ticks — the redraw gets skipped and the live
+                // playhead freezes (only a scrub/zoom would wake it).
+                let _ = timeline.date
                 BackgroundArtRenderer.drawRoute(
                     &ctx, size: size,
                     samples: track.samples,
