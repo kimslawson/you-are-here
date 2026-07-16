@@ -24,6 +24,9 @@ struct ContentView: View {
     // start. Meaningful only for those two.
     @State private var slopeSelected: TimeInterval?
     @State private var slopeDragAnchor: TimeInterval?
+    // True after the edge haptic fired, until the playhead leaves the edge (or
+    // the drag ends) — one bump per arrival, not one per drag update.
+    @State private var scrubEdgeLatched = false
     // Route background: pinch-zoom factor (1 = whole route fit), and the value
     // committed at the last pinch's end (the base the live gesture multiplies).
     @State private var routeZoom: CGFloat = 1
@@ -346,9 +349,45 @@ struct ContentView: View {
                 let clamped = min(max(target, 0), activeTrack.activeDuration)
                 // Within a second of the end: back to nil — live tracking, or
                 // (in playback) resting at the recording's end.
-                slopeSelected = activeTrack.activeDuration - clamped < 1 ? nil : clamped
+                let newSelected: TimeInterval? =
+                    activeTrack.activeDuration - clamped < 1 ? nil : clamped
+                scrubHaptics(target: target, clamped: clamped, newSelected: newSelected)
+                slopeSelected = newSelected
             }
-            .onEnded { _ in slopeDragAnchor = nil }
+            .onEnded { _ in
+                slopeDragAnchor = nil
+                scrubEdgeLatched = false
+            }
+    }
+
+    /// Tactile feedback while scrubbing: a light bump crossing a pause seam,
+    /// a firmer one arriving at either end of the trail. The edge bump latches
+    /// so holding a drag past the clamp doesn't machine-gun.
+    private func scrubHaptics(target: TimeInterval, clamped: TimeInterval,
+                              newSelected: TimeInterval?) {
+        let oldPlayhead = slopeSelected ?? activeTrack.activeDuration
+        let newPlayhead = newSelected ?? activeTrack.activeDuration
+
+        // Seam crossings: sign change across a mark. One bump per update even
+        // if a fast drag jumps several seams.
+        if activeTrack.pauseMarks.contains(where: {
+            ($0 - oldPlayhead) * ($0 - newPlayhead) < 0
+        }) {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        }
+
+        // Ends: pushed past the first recording, or arrived back at the
+        // present (the moment the scrub snaps to live / the recording's end).
+        let atStart = clamped == 0 && target < 0
+        let atEnd = newSelected == nil && slopeSelected != nil
+        if atStart || atEnd {
+            if !scrubEdgeLatched {
+                UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+                scrubEdgeLatched = true
+            }
+        } else if clamped > 0 {
+            scrubEdgeLatched = false
+        }
     }
 
     /// Pinch to zoom the Route map. Zoom floors at 1 (the whole route fit to the
