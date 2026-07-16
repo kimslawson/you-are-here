@@ -236,29 +236,19 @@ struct WayfindingView<Trailing: View>: View {
 
     private func complicationsRow(scale: CGFloat) -> some View {
         let size = smallSize * scale
-        // The invisible sizing row fixes the footprint; the live row renders on
-        // top, leading-aligned, always at or under the template width.
-        return ZStack(alignment: .leading) {
-            rowContent(size: size, sizing: true).opacity(0)
-            rowContent(size: size, sizing: false)
-        }
-        .fixedSize(horizontal: true, vertical: false)   // measure/render at natural width
-    }
-
-    private func rowContent(size: CGFloat, sizing: Bool) -> some View {
         let comps = Complication.decode(state.complications)
         return HStack(spacing: size * 0.7) {
             ForEach(Array(comps.enumerated()), id: \.offset) { index, comp in
                 if index > 0 { SeparatorDot(size: size) }
-                complication(comp, size: size, sizing: sizing)
+                complication(comp, size: size)
             }
         }
         .lineLimit(1)
-        .fixedSize(horizontal: true, vertical: false)
+        .fixedSize(horizontal: true, vertical: false)   // measure/render at natural width
     }
 
     @ViewBuilder
-    private func complication(_ c: Complication, size: CGFloat, sizing: Bool) -> some View {
+    private func complication(_ c: Complication, size: CGFloat) -> some View {
         switch c {
         case .altitude:
             // Altitude and compass keep their icons; time and temperature are
@@ -266,7 +256,7 @@ struct WayfindingView<Trailing: View>: View {
             let text = Formatting.altitudeString(meters: state.altitudeMeters,
                                                  metric: state.unitIsMetric)
             Label {
-                complicationText(sizing ? eights(text) : text, color: Theme.secondary, size: size)
+                complicationText(text, template: eights(text), color: Theme.secondary, size: size)
             } icon: {
                 Image(systemName: "mountain.2.fill")
                     .font(.system(size: size * 0.85))
@@ -275,21 +265,21 @@ struct WayfindingView<Trailing: View>: View {
         case .compass:
             let color = Theme.textColor(changed: state.headingChanged, base: Theme.secondary)
             Label {
-                complicationText(sizing ? (state.headingDegrees == nil ? "—" : "WW 888°")
-                                        : Formatting.headingString(state.headingDegrees),
+                complicationText(Formatting.headingString(state.headingDegrees),
+                                 template: state.headingDegrees == nil ? "—" : "WW 888°",
                                  color: color, size: size)
             } icon: {
                 CompassArrow(degrees: state.headingContinuous, size: size * 0.85, color: color)
             }
         case .time:
-            complicationText(sizing ? (state.clock24 ? "88:88" : "88:88 PM")
-                                    : Formatting.timeString(displayDate ?? Date(), clock24: state.clock24),
+            complicationText(Formatting.timeString(displayDate ?? Date(), clock24: state.clock24),
+                             template: state.clock24 ? "88:88" : "88:88 PM",
                              color: Theme.textColor(changed: state.timeChanged, base: Theme.secondary),
                              size: size)
         case .temperature:
             let text = Formatting.temperatureString(celsius: state.temperatureC,
                                                     metric: state.unitIsCelsius)
-            complicationText(sizing ? eights(text) : text,
+            complicationText(text, template: eights(text),
                              color: Theme.textColor(changed: state.temperatureChanged, base: Theme.secondary),
                              size: size)
         }
@@ -302,10 +292,23 @@ struct WayfindingView<Trailing: View>: View {
         String(s.map { $0.isNumber ? "8" : $0 })
     }
 
-    private func complicationText(_ text: String, color: Color, size: CGFloat) -> some View {
-        Text(text)
+    /// A value in a fixed-width slot: an invisible widest-template ghost does
+    /// the layout, the live text draws over it leading-aligned. The slot (and
+    /// so the ViewThatFits scale choice, and the separator-dot positions)
+    /// holds steady while the value ticks. One extra Text per value — cheap
+    /// enough for the Live Activity's archived view hierarchy, unlike a whole
+    /// duplicated sizing row.
+    private func complicationText(_ text: String, template: String,
+                                  color: Color, size: CGFloat) -> some View {
+        Text(template)
             .font(state.font(size: size, weight: .medium))
-            .foregroundColor(color)
+            .opacity(0)
+            .overlay(alignment: .leading) {
+                Text(text)
+                    .font(state.font(size: size, weight: .medium))
+                    .foregroundColor(color)
+                    .fixedSize()   // never squeezed by the slot; overflows until rescale
+            }
     }
 }
 
