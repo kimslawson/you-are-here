@@ -67,10 +67,12 @@ When the **town, road, or compass direction changes**, that field briefly
   stored as hex; default is white — black in light mode). Both travel to the
   widget inside `ContentState`, like the font and units.
 - **Modes (opt-in, purely aesthetic backdrops):** *Settings ▸ Appearance ▸
-  Mode*, or the bezel's **Mode** control — a vertical menu with a live
+  Mode*, or the bezel's **Mode** control — a vertical menu with a square
   miniature render of each mode (the real renderers over the real session
-  data, `ModeMenu.swift`). Dim backdrops behind the readout, inspired by
-  idle car-nav displays. Drawing lives in `Shared/BackgroundArtRenderer.swift` (pure
+  data, `ModeMenu.swift`). Renders are cached to disk (keyed light/dark), so
+  a fresh session shows each mode's last-known look instead of a blank while
+  roads/contours/the trail haven't arrived yet. Dim backdrops behind the
+  readout, inspired by idle car-nav displays. Drawing lives in `Shared/BackgroundArtRenderer.swift` (pure
   functions) so all surfaces share it: animated in the app, static-per-frame
   in PiP (~1/s) and the Live Activity (per content update; the choice rides
   in `ContentState.backgroundID`). Streets is app + PiP only — road geometry

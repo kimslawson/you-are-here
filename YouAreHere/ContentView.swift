@@ -134,7 +134,10 @@ struct ContentView: View {
                         Spacer()
                         if showModeMenu {
                             ModeMenuView(track: activeTrack,
-                                         current: BackgroundArt(rawValue: backgroundArt) ?? .off) { mode in
+                                         current: BackgroundArt(rawValue: backgroundArt) ?? .off,
+                                         // Never outgrow the screen (landscape);
+                                         // the menu scrolls past this.
+                                         maxHeight: geo.size.height - 150) { mode in
                                 backgroundArt = mode.rawValue
                                 engine.reloadAppearance()
                                 withAnimation(.easeOut(duration: 0.2)) { showModeMenu = false }
