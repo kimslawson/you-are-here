@@ -27,8 +27,6 @@ struct ContentView: View {
     // True after the edge haptic fired, until the playhead leaves the edge (or
     // the drag ends) — one bump per arrival, not one per drag update.
     @State private var scrubEdgeLatched = false
-    // Last stretch tick fired while pulling past an end (0 = none).
-    @State private var scrubStretchStep = 0
     // Route background: pinch-zoom factor (1 = whole route fit), and the value
     // committed at the last pinch's end (the base the live gesture multiplies).
     @State private var routeZoom: CGFloat = 1
@@ -45,6 +43,7 @@ struct ContentView: View {
     @State private var shareItem: ShareItem?
     // The bezel's Mode menu (vertical list with live preview swatches).
     @State private var showModeMenu = false
+    @State private var didPrerenderSwatches = false
 
     /// The trail everything trail-driven reads: the playback route if one is
     /// loaded, else the live recording.
@@ -221,6 +220,23 @@ struct ContentView: View {
             // the process never comes back.
             if phase == .background { engine.saveTrack() }
         }
+        .onReceive(engine.$lastCoordinate.compactMap { $0 }) { _ in
+            // Warm the mode-menu thumbnails shortly after the first fix: by
+            // then the trail has a couple of points, so Slope/Route (and the
+            // self-contained modes) cache real art before the menu is ever
+            // opened. Streets/Topo render only if their data has already
+            // arrived — they fetch (and send your location) only when used.
+            guard !didPrerenderSwatches else { return }
+            didPrerenderSwatches = true
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 6_000_000_000)
+                _ = ModeSwatchCache.shared.refresh(
+                    track: engine.track,
+                    metric: engine.state.unitIsMetric,
+                    family: engine.state.appFont,
+                    light: engine.state.lightMode)
+            }
+        }
         .onDisappear {
             UIApplication.shared.isIdleTimerDisabled = false
         }
@@ -385,14 +401,12 @@ struct ContentView: View {
             .onEnded { _ in
                 slopeDragAnchor = nil
                 scrubEdgeLatched = false
-                scrubStretchStep = 0
             }
     }
 
     /// Tactile feedback while scrubbing: a medium bump crossing a pause seam,
-    /// a firm (rigid) one arriving at either end, then soft "stretch" ticks —
-    /// rising in intensity — as the drag keeps pulling past the clamp, like a
-    /// rubber band. The edge bump latches so it fires once per arrival.
+    /// a firm (rigid) one arriving at either end of the trail. The edge bump
+    /// latches so holding a drag past the clamp doesn't machine-gun.
     private func scrubHaptics(target: TimeInterval, clamped: TimeInterval,
                               newSelected: TimeInterval?) {
         let oldPlayhead = slopeSelected ?? activeTrack.activeDuration
@@ -418,17 +432,6 @@ struct ContentView: View {
         } else if clamped > 0 {
             scrubEdgeLatched = false
         }
-
-        // Stretch: pulling further past an end ticks softly about every 5% of
-        // screen width of extra pull (~18 s of virtual time), a little harder
-        // each step; easing back ticks down the same detents.
-        let overshoot = max(-target, target - activeTrack.activeDuration, 0)
-        let stretchStep = Int(overshoot / 18)
-        if stretchStep != scrubStretchStep, stretchStep > 0 {
-            UIImpactFeedbackGenerator(style: .soft)
-                .impactOccurred(intensity: min(1, 0.4 + CGFloat(stretchStep) * 0.12))
-        }
-        scrubStretchStep = stretchStep
     }
 
     /// Pinch to zoom the Route map. Zoom floors at 1 (the whole route fit to the

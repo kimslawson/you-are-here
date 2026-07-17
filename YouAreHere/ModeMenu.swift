@@ -69,11 +69,11 @@ struct ModeMenuView: View {
     @ViewBuilder
     private func swatch(for mode: BackgroundArt) -> some View {
         if mode == .off {
+            // Disabled-looking: a dimmed wash with a grey slash corner to corner.
             ZStack {
                 Theme.background
-                Image(systemName: "circle.slash")
-                    .font(.system(size: 16))
-                    .foregroundColor(Theme.muted)
+                Rectangle().fill(Color.gray.opacity(0.15))
+                SlashShape().stroke(Color.gray.opacity(0.55), lineWidth: 2)
             }
         } else if let image = swatches[mode] {
             Image(uiImage: image)
@@ -87,6 +87,16 @@ struct ModeMenuView: View {
                     .foregroundColor(Theme.muted)
             }
         }
+    }
+}
+
+/// A "/" corner to corner, for the Off tile's slash.
+private struct SlashShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        p.move(to: CGPoint(x: rect.minX, y: rect.maxY))
+        p.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        return p
     }
 }
 

@@ -63,12 +63,13 @@ enum AppFont: String, CaseIterable, Identifiable, Codable {
     /// town point size (negative = up). Metric centering leaves title-case
     /// names looking high-set (see WayfindingView.townLine), so most families
     /// get a -5% lift — but Overpass and FS Millbank carry extra ascent in
-    /// their vertical metrics and need little to none (Millbank even rides a
-    /// touch low, i.e. positive).
+    /// their vertical metrics and ride high instead, so they get pushed the
+    /// other way (Overpass notably so — it sat visibly high in the Live
+    /// Activity).
     var townOffsetFactor: CGFloat {
         switch self {
         case .fsMillbank: return 0.01
-        case .overpass:   return -0.01
+        case .overpass:   return 0.04
         default:          return -0.05
         }
     }
