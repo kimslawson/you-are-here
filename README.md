@@ -66,9 +66,11 @@ When the **town, road, or compass direction changes**, that field briefly
   the black/white/gray values) and a **custom flash color** (color picker,
   stored as hex; default is white — black in light mode). Both travel to the
   widget inside `ContentState`, like the font and units.
-- **Backgrounds (opt-in, purely aesthetic):** *Settings ▸ Appearance ▸
-  Background.* Dim backdrops behind the readout, inspired by idle car-nav
-  displays. Drawing lives in `Shared/BackgroundArtRenderer.swift` (pure
+- **Modes (opt-in, purely aesthetic backdrops):** *Settings ▸ Appearance ▸
+  Mode*, or the bezel's **Mode** control — a vertical menu with a live
+  miniature render of each mode (the real renderers over the real session
+  data, `ModeMenu.swift`). Dim backdrops behind the readout, inspired by
+  idle car-nav displays. Drawing lives in `Shared/BackgroundArtRenderer.swift` (pure
   functions) so all surfaces share it: animated in the app, static-per-frame
   in PiP (~1/s) and the Live Activity (per content update; the choice rides
   in `ContentState.backgroundID`). Streets is app + PiP only — road geometry
@@ -139,8 +141,9 @@ When the **town, road, or compass direction changes**, that field briefly
   UI switches to Comic Sans (well, Comic Neue — iOS doesn't ship the real
   thing). Ten more taps restore whatever font you had before.
 - **Control bezel:** no persistent chrome — tap anywhere to summon a
-  bottom-center pill with **Settings / Share / Routes** (icon + title each);
-  it fades back out after a few seconds.
+  bottom-center pill with **Mode / Settings / Share / Routes** (icon + title
+  each); it fades back out after a few seconds. Mode opens the preview menu
+  above the bezel; the fade pauses while it's open.
 - **Complications (bottom line):** *Settings ▸ Complications* — pick any subset
   of **Altitude**, **Compass**, **Time**, **Temperature** (dot-separated, in
   that order). With none selected the row is empty but keeps its height, so the

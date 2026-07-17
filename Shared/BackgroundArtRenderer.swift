@@ -30,6 +30,19 @@ enum BackgroundArt: String, CaseIterable, Identifiable {
     case route
 
     var id: String { rawValue }
+
+    /// Display name (settings picker + the HUD mode menu).
+    var label: String {
+        switch self {
+        case .off:        return "Off"
+        case .streets:    return "Streets"
+        case .topo:       return "Topo"
+        case .procedural: return "Procedural"
+        case .neon:       return "Neon"
+        case .slope:      return "Slope"
+        case .route:      return "Route"
+        }
+    }
 }
 
 /// One road polyline, in meters east/north of the fetch center.

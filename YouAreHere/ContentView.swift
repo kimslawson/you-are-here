@@ -41,6 +41,8 @@ struct ContentView: View {
     @State private var showRoutes = false
     @State private var showShareOptions = false
     @State private var shareItem: ShareItem?
+    // The bezel's Mode menu (vertical list with live preview swatches).
+    @State private var showModeMenu = false
 
     /// The trail everything trail-driven reads: the playback route if one is
     /// loaded, else the live recording.
@@ -121,18 +123,36 @@ struct ContentView: View {
                     .animation(.easeOut(duration: 0.25), value: engine.state)
                 }
 
-                // Control bezel: tap anywhere to summon Settings / Share /
+                // Control bezel: tap anywhere to summon Mode / Settings / Share /
                 // Routes, bottom-center where thumbs live; it fades out after a
                 // few seconds. No persistent chrome — the readout owns the screen.
+                // Mode opens a vertical menu of live-preview swatches above it.
                 if chromeVisible {
                     VStack {
                         Spacer()
-                        HStack(alignment: .top, spacing: 26) {
-                            bezelControl("Settings", icon: "gearshape") { showSettings = true }
-                            bezelControl("Share", icon: "square.and.arrow.up") { showShareOptions = true }
-                            bezelControl("Routes", icon: "list.bullet") { showRoutes = true }
+                        if showModeMenu {
+                            ModeMenuView(track: activeTrack,
+                                         current: BackgroundArt(rawValue: backgroundArt) ?? .off) { mode in
+                                backgroundArt = mode.rawValue
+                                engine.reloadAppearance()
+                                withAnimation(.easeOut(duration: 0.2)) { showModeMenu = false }
+                                revealChrome()   // re-arm the fade
+                            }
+                            .padding(.bottom, 10)
+                            .transition(.opacity.combined(with: .move(edge: .bottom)))
                         }
-                        .padding(.horizontal, 26)
+                        HStack(alignment: .top, spacing: 22) {
+                            bezelControl("Mode", icon: "paintpalette") {
+                                withAnimation(.easeOut(duration: 0.2)) { showModeMenu.toggle() }
+                                // Browsing shouldn't get yanked away mid-choice;
+                                // selection / outside tap re-arms the fade.
+                                if showModeMenu { chromeHideTask?.cancel() } else { revealChrome() }
+                            }
+                            bezelControl("Settings", icon: "gearshape") { showModeMenu = false; showSettings = true }
+                            bezelControl("Share", icon: "square.and.arrow.up") { showModeMenu = false; showShareOptions = true }
+                            bezelControl("Routes", icon: "list.bullet") { showModeMenu = false; showRoutes = true }
+                        }
+                        .padding(.horizontal, 24)
                         .padding(.vertical, 12)
                         .background(.ultraThinMaterial,
                                     in: RoundedRectangle(cornerRadius: 22, style: .continuous))
@@ -143,6 +163,9 @@ struct ContentView: View {
             }
             .contentShape(Rectangle())
             .onTapGesture {
+                if showModeMenu {
+                    withAnimation(.easeOut(duration: 0.2)) { showModeMenu = false }
+                }
                 revealChrome()
                 registerEggTap()
             }
@@ -519,14 +542,10 @@ struct SettingsView: View {
                     Text("Fields briefly flash when their value changes.")
                         .font(.footnote)
                         .foregroundColor(.secondary)
-                    Picker("Background", selection: $backgroundArt) {
-                        Text("Off").tag(BackgroundArt.off.rawValue)
-                        Text("Streets").tag(BackgroundArt.streets.rawValue)
-                        Text("Topo").tag(BackgroundArt.topo.rawValue)
-                        Text("Procedural").tag(BackgroundArt.procedural.rawValue)
-                        Text("Neon").tag(BackgroundArt.neon.rawValue)
-                        Text("Slope").tag(BackgroundArt.slope.rawValue)
-                        Text("Route").tag(BackgroundArt.route.rawValue)
+                    Picker("Mode", selection: $backgroundArt) {
+                        ForEach(BackgroundArt.allCases) { mode in
+                            Text(mode.label).tag(mode.rawValue)
+                        }
                     }
                     .pickerStyle(.menu)
                     .onChange(of: backgroundArt) { _ in engine.reloadAppearance() }
