@@ -645,13 +645,21 @@ final class LocationEngine: NSObject, ObservableObject {
     // MARK: Live Activity
 
     private func startLiveActivity() {
-        guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+        guard ActivityAuthorizationInfo().areActivitiesEnabled else {
+            // Diagnostics for the Xcode-launch case (visible in the debug
+            // console, harmless stdout otherwise): every tick retries start,
+            // so a repeating line here means the system says activities are
+            // off for this app right now.
+            print("LiveActivity: areActivitiesEnabled == false")
+            return
+        }
         guard activity == nil else { return }
 
         // If we were relaunched (e.g. cold-started by the pause intent), reconnect
         // to the Activity the system is already showing instead of making a new one.
         if let existing = Activity<LocationActivityAttributes>.activities.first {
             activity = existing
+            print("LiveActivity: reconnected to existing activity \(existing.id)")
             return
         }
 
@@ -662,8 +670,12 @@ final class LocationEngine: NSObject, ObservableObject {
         let content = ActivityContent(state: initial, staleDate: staleDate)
         do {
             activity = try Activity.request(attributes: attributes, content: content, pushType: nil)
+            print("LiveActivity: started \(activity?.id ?? "?")")
         } catch {
-            // Activities disabled or over the limit — app UI still works.
+            // Activities disabled or over the limit — app UI still works, and
+            // the next tick retries. The error names the real reason when the
+            // Xcode-launched build fails to show an activity.
+            print("LiveActivity: request failed: \(error)")
         }
     }
 

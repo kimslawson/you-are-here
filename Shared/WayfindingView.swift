@@ -356,12 +356,13 @@ struct SpeedLimitSign: View {
             Text("LIMIT").font(Theme.font(size: height * 0.18, weight: .semibold, family: family))
             Text("\(value)")
                 .font(Theme.font(size: height * 0.48, weight: .bold, family: family))
+                .padding(.top, height * 0.03)
         }
         .foregroundColor(color)
         .lineLimit(1)
         .minimumScaleFactor(0.5)
         .padding(.horizontal, height * 0.09)
-        .padding(.top, height * 0.055)
+        .padding(.top, height * 0.09)
         .padding(.bottom, height * 0.02)
         .background(
             RoundedRectangle(cornerRadius: height * 0.08)
