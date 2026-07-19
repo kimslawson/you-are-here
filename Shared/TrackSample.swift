@@ -32,4 +32,36 @@ struct TrackSample: Codable {
     /// Recording segment index. Parking closes a segment, resuming opens the
     /// next; renderers never connect points across segments.
     var segment: Int = 0
+
+    private enum CodingKeys: String, CodingKey {
+        case date, altitudeMeters, latitude, longitude, town, road, route,
+             headingDegrees, headingContinuous, temperatureC, tripDistanceMeters,
+             activeTime, segment
+    }
+
+    /// Custom encode only (decoding stays synthesized): round each number to
+    /// the precision that matters before it hits JSON — raw doubles print 15+
+    /// digits and balloon saved/exported routes for nothing. Lat/lon keep six
+    /// decimals (≈0.11 m); everything else one decimal or whole units, well
+    /// past display precision.
+    func encode(to encoder: Encoder) throws {
+        func rounded(_ v: Double, _ places: Int) -> Double {
+            let f = pow(10, Double(places))
+            return (v * f).rounded() / f
+        }
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(date, forKey: .date)
+        try c.encodeIfPresent(altitudeMeters.map { rounded($0, 1) }, forKey: .altitudeMeters)
+        try c.encodeIfPresent(latitude.map { rounded($0, 6) }, forKey: .latitude)
+        try c.encodeIfPresent(longitude.map { rounded($0, 6) }, forKey: .longitude)
+        try c.encode(town, forKey: .town)
+        try c.encode(road, forKey: .road)
+        try c.encodeIfPresent(route, forKey: .route)
+        try c.encodeIfPresent(headingDegrees.map { rounded($0, 1) }, forKey: .headingDegrees)
+        try c.encodeIfPresent(headingContinuous.map { rounded($0, 1) }, forKey: .headingContinuous)
+        try c.encodeIfPresent(temperatureC.map { rounded($0, 1) }, forKey: .temperatureC)
+        try c.encodeIfPresent(tripDistanceMeters.map { $0.rounded() }, forKey: .tripDistanceMeters)
+        try c.encode(rounded(activeTime, 1), forKey: .activeTime)
+        try c.encode(segment, forKey: .segment)
+    }
 }

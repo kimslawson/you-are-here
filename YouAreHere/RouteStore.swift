@@ -47,9 +47,15 @@ final class RouteStore {
     func save(_ track: TrackLog) {
         guard let first = track.first, track.samples.count >= 2 else { return }
         let route = SavedRoute(started: first.date, samples: track.samples,
-                               pauseMarks: track.pauseMarks)
+                               pauseMarks: roundedMarks(track.pauseMarks))
         guard let data = try? Self.encoder.encode(route) else { return }
         try? data.write(to: url(for: first.date), options: .atomic)
+    }
+
+    /// Tenth-of-a-second is plenty for seam markers (samples land every ~4 s);
+    /// raw doubles print 15+ digits in JSON.
+    private func roundedMarks(_ marks: [TimeInterval]) -> [TimeInterval] {
+        marks.map { ($0 * 10).rounded() / 10 }
     }
 
     private func url(for started: Date) -> URL {
@@ -86,7 +92,7 @@ final class RouteStore {
     func exportURL(for track: TrackLog) -> URL? {
         guard let first = track.first else { return nil }
         let route = SavedRoute(started: first.date, samples: track.samples,
-                               pauseMarks: track.pauseMarks)
+                               pauseMarks: roundedMarks(track.pauseMarks))
         guard let data = try? Self.encoder.encode(route) else { return nil }
         let name = "YouAreHere-route-\(Int(first.date.timeIntervalSince1970)).json"
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(name)
