@@ -21,6 +21,7 @@ final class LocationEngine: NSObject, ObservableObject {
         headingContinuous: nil,
         unitIsMetric: false, unitIsCelsius: false, clock24: false,
         complications: Complication.defaultRaw, temperatureC: nil,
+        tripDistanceMeters: nil,
         fontID: AppFont.helvetica.rawValue,
         lightMode: false, flashHex: nil,
         backgroundID: BackgroundArt.off.rawValue,
@@ -84,6 +85,10 @@ final class LocationEngine: NSObject, ObservableObject {
     private let tempRefreshInterval: TimeInterval = 600   // 10 min
     /// Last committed temperature (°C), for the >1-display-degree flash.
     private var lastTemperatureC: Double?
+
+    // MARK: Trip odometer (session-scoped, like the trail)
+    private var tripDistanceMeters: Double = 0
+    private var lastTripLocation: CLLocation?
 
     // MARK: Tick throttle
     private var tickTimer: Timer?
@@ -444,6 +449,7 @@ final class LocationEngine: NSObject, ObservableObject {
             unitIsMetric: metric, unitIsCelsius: appearance.unitIsCelsius,
             clock24: appearance.clock24, complications: appearance.complications,
             temperatureC: temperatureC,
+            tripDistanceMeters: tripDistanceMeters,
             fontID: appearance.fontID,
             lightMode: appearance.light, flashHex: appearance.flashHex,
             backgroundID: appearance.backgroundID,
@@ -463,7 +469,8 @@ final class LocationEngine: NSObject, ObservableObject {
             latitude: loc.coordinate.latitude, longitude: loc.coordinate.longitude,
             town: town, road: road, route: route,
             headingDegrees: heading, headingContinuous: continuousHeading,
-            temperatureC: temperatureC))
+            temperatureC: temperatureC,
+            tripDistanceMeters: tripDistanceMeters))
 
         // Commit the displayed values for the next comparison.
         lastTown = town
@@ -506,6 +513,7 @@ final class LocationEngine: NSObject, ObservableObject {
         s.clock24 = appearance.clock24
         s.complications = appearance.complications
         s.temperatureC = temperatureC
+        s.tripDistanceMeters = lastTripLocation == nil ? s.tripDistanceMeters : tripDistanceMeters
         s.townChanged = false
         s.roadChanged = false
         s.headingChanged = false
@@ -714,6 +722,15 @@ extension LocationEngine: CLLocationManagerDelegate {
             self.latestLocation = loc
             self.lastCoordinate = loc.coordinate
             self.speedMPS = max(0, loc.speed)
+            // Trip odometer: sum fix-to-fix ground distance. Skip implausible
+            // jumps (cold-start relocations, glitches) and poor fixes.
+            if loc.horizontalAccuracy >= 0, loc.horizontalAccuracy < 100 {
+                if let prev = self.lastTripLocation {
+                    let d = loc.distance(from: prev)
+                    if d < 1000 { self.tripDistanceMeters += d }
+                }
+                self.lastTripLocation = loc
+            }
             self.fuser.ingestGPS(loc)
             // Drive ticks off location too, so updates continue in the background
             // (Timers don't fire reliably when suspended; location callbacks do).

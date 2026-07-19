@@ -20,6 +20,9 @@ struct TrackSample: Codable {
     var headingDegrees: Double?
     var headingContinuous: Double?
     var temperatureC: Double?
+    /// Trip odometer at this moment, meters — retraces while scrubbing.
+    /// Optional so routes saved before the field existed still decode.
+    var tripDistanceMeters: Double?
 
     // Set by TrackLog.record — callers leave the defaults.
     /// Seconds of *active* (un-parked) recording elapsed at this sample: the

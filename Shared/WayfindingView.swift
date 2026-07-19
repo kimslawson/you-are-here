@@ -271,6 +271,11 @@ struct WayfindingView<Trailing: View>: View {
             } icon: {
                 CompassArrow(degrees: state.headingContinuous, size: size * 0.85, color: color)
             }
+        case .distance:
+            let text = Formatting.distanceString(meters: state.tripDistanceMeters,
+                                                 metric: state.unitIsMetric)
+            complicationText(text, template: eights(text),
+                             color: Theme.secondary, size: size)
         case .time:
             complicationText(Formatting.timeString(displayDate ?? Date(), clock24: state.clock24),
                              template: state.clock24 ? "88:88" : "88:88 PM",

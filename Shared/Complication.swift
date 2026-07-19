@@ -7,6 +7,7 @@ import Foundation
 enum Complication: String, CaseIterable, Identifiable, Codable {
     case altitude
     case compass
+    case distance
     case time
     case temperature
 
@@ -16,6 +17,7 @@ enum Complication: String, CaseIterable, Identifiable, Codable {
         switch self {
         case .altitude:    return "Altitude"
         case .compass:     return "Compass"
+        case .distance:    return "Distance traveled"
         case .time:        return "Time"
         case .temperature: return "Temperature"
         }

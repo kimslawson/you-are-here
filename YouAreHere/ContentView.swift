@@ -364,6 +364,7 @@ struct ContentView: View {
         s.headingDegrees = sample.headingDegrees
         s.headingContinuous = sample.headingContinuous
         s.temperatureC = sample.temperatureC
+        s.tripDistanceMeters = sample.tripDistanceMeters
         s.speedLimitKmh = nil        // not recorded on the trail; a live-only concept
         s.townChanged = false
         s.roadChanged = false
@@ -604,7 +605,7 @@ struct SettingsView: View {
                     ForEach(Complication.allCases) { comp in
                         Toggle(comp.label, isOn: complicationBinding(comp))
                     }
-                    Text("Temperature is fetched from Open-Meteo")
+                    Text("Temperature is fetched from Open-Meteo. Distance is the trip odometer since launch; scrubbing Slope/Route rewinds it too.")
                         .font(.footnote)
                         .foregroundColor(.secondary)
                 }

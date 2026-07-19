@@ -78,6 +78,18 @@ enum Formatting {
         return String(format: "%d:%02d %@", h12, m, h < 12 ? "AM" : "PM")
     }
 
+    /// Trip distance in the display unit: one decimal under 100 ("12.4 mi" /
+    /// "20.0 km"), whole above ("104 mi"). Em dash when unknown.
+    static func distanceString(meters: Double?, metric: Bool) -> String {
+        guard let meters else { return "—" }
+        let value = metric ? meters / 1000 : meters / 1609.344
+        let unit = metric ? "km" : "mi"
+        if value < 99.95 {
+            return String(format: "%.1f %@", value, unit)
+        }
+        return "\(Int(value.rounded())) \(unit)"
+    }
+
     /// Whole-degree temperature in the display unit, e.g. "54°F" / "12°C". Em
     /// dash unknown. (`metric` here means Celsius — the temperature-unit flag.)
     static func temperatureString(celsius: Double?, metric: Bool) -> String {

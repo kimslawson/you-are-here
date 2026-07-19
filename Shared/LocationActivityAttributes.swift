@@ -49,6 +49,8 @@ struct LocationActivityAttributes: ActivityAttributes {
         /// Current air temperature in °C (canonical); formatted per unit. nil
         /// when unknown / the temperature complication is off.
         var temperatureC: Double?
+        /// Trip odometer since launch, meters (canonical); formatted per unit.
+        var tripDistanceMeters: Double?
         /// Chosen UI typeface (`AppFont` raw value); carried for the same reason.
         var fontID: String
         /// Light mode (inverted palette); carried for the same reason.
@@ -102,6 +104,7 @@ struct LocationActivityAttributes: ActivityAttributes {
                 clock24: false,
                 complications: Complication.defaultRaw,
                 temperatureC: 7,
+                tripDistanceMeters: 68_400,
                 fontID: AppFont.helvetica.rawValue,
                 lightMode: false,
                 flashHex: nil,
