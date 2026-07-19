@@ -357,12 +357,16 @@ struct ContentView: View {
         min(max(size.width * 0.16, 44), 120)
     }
 
-    /// One bezel control: icon over a small text title.
+    /// One bezel control: icon over a small text title. SF Symbols vary in
+    /// intrinsic height (list.bullet is squat, share's arrow is tall), so each
+    /// icon centers in a fixed box — labels then share one baseline across
+    /// controls instead of riding up under the shorter glyphs.
     private func bezelControl(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: 5) {
                 Image(systemName: icon)
                     .font(.system(size: 22, weight: .medium))
+                    .frame(height: 26)
                 Text(title)
                     .font(.system(size: 11, weight: .medium))
             }
