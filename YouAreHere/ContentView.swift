@@ -47,6 +47,9 @@ struct ContentView: View {
     // The bezel's Mode menu (vertical list with live preview swatches).
     @State private var showModeMenu = false
     @State private var didPrerenderSwatches = false
+    // A saved route picked while a live drive is recording: held here until the
+    // user confirms the switch (see the alert below).
+    @State private var pendingPlayback: SavedRoute?
 
     /// The trail everything trail-driven reads: the playback route if one is
     /// loaded, else the live recording.
@@ -182,7 +185,14 @@ struct ContentView: View {
                             }
                             bezelControl("Settings", icon: "gearshape") { showModeMenu = false; showSettings = true }
                             bezelControl("Share", icon: "square.and.arrow.up") { showModeMenu = false; showShareOptions = true }
-                            bezelControl("Routes", icon: "list.bullet") { showModeMenu = false; showRoutes = true }
+                            bezelControl("Routes", icon: "list.bullet") {
+                                showModeMenu = false
+                                // Save the in-progress drive first, so it
+                                // appears in the list (and survives no matter
+                                // what gets picked there).
+                                engine.saveTrack()
+                                showRoutes = true
+                            }
                         }
                         .padding(.horizontal, 24)
                         .padding(.vertical, 12)
@@ -276,8 +286,29 @@ struct ContentView: View {
                 .preferredColorScheme(engine.state.lightMode ? .light : .dark)
         }
         .sheet(isPresented: $showRoutes) {
-            RoutesListView { route in startPlayback(route) }
-                .preferredColorScheme(engine.state.lightMode ? .light : .dark)
+            RoutesListView(currentStarted: engine.track.first?.date) { route in
+                if RoutesListView.isCurrent(route.started, engine.track.first?.date) {
+                    return   // that IS the live drive — nothing to switch to
+                }
+                if playback == nil, engine.track.isScrubable {
+                    // Recording in progress: confirm before switching views.
+                    pendingPlayback = route
+                } else {
+                    startPlayback(route)
+                }
+            }
+            .preferredColorScheme(engine.state.lightMode ? .light : .dark)
+        }
+        .alert("Switch to saved route?",
+               isPresented: Binding(get: { pendingPlayback != nil },
+                                    set: { if !$0 { pendingPlayback = nil } })) {
+            Button("Play back") {
+                if let route = pendingPlayback { startPlayback(route) }
+                pendingPlayback = nil
+            }
+            Button("Cancel", role: .cancel) { pendingPlayback = nil }
+        } message: {
+            Text("Your current drive is saved and keeps recording in the background. Tap the return arrow to come back to it live.")
         }
         .sheet(item: $shareItem) { item in
             ActivityView(items: item.items)
@@ -365,6 +396,7 @@ struct ContentView: View {
     /// a non-trail background is active, hop to Route so there's something to
     /// see. The snap-to-present control exits back to live.
     private func startPlayback(_ route: SavedRoute) {
+        engine.saveTrack()   // never lose the in-progress drive to a switch
         if let art = BackgroundArt(rawValue: backgroundArt), art != .slope, art != .route {
             backgroundArt = BackgroundArt.route.rawValue
             engine.reloadAppearance()

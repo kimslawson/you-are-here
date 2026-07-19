@@ -4,6 +4,8 @@ import SwiftUI
 /// swipe left to delete (the standard iOS trailing Delete).
 struct RoutesListView: View {
     @Environment(\.dismiss) private var dismiss
+    /// Start date of the in-progress drive, so its row can be tagged.
+    var currentStarted: Date?
     /// Called with the decoded route when the user picks one to play back.
     var onPlay: (SavedRoute) -> Void
 
@@ -29,7 +31,7 @@ struct RoutesListView: View {
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text(entry.started.formatted(date: .abbreviated, time: .shortened))
                                         .foregroundColor(.primary)
-                                    Text("\(Self.durationLabel(entry.duration)) · \(entry.samples) points")
+                                    Text("\(Self.durationLabel(entry.duration)) · \(entry.samples) points\(Self.isCurrent(entry.started, currentStarted) ? " · recording now" : "")")
                                         .font(.footnote)
                                         .foregroundColor(.secondary)
                                 }
@@ -50,6 +52,13 @@ struct RoutesListView: View {
             }
             .onAppear { entries = RouteStore.shared.list() }
         }
+    }
+
+    /// Same drive? Saved dates round-trip ISO-8601 (whole seconds) while the
+    /// live trail keeps sub-second precision, so compare with tolerance.
+    static func isCurrent(_ a: Date, _ b: Date?) -> Bool {
+        guard let b else { return false }
+        return abs(a.timeIntervalSince(b)) < 1
     }
 
     /// Active driving time, human-shaped: "7 min", "1 h 20 min".
