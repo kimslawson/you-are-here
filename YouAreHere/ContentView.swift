@@ -231,8 +231,10 @@ struct ContentView: View {
             UIApplication.shared.isIdleTimerDisabled = engine.isRunning && !paused
         }
         .onChange(of: engine.isRunning) { running in
-            // Stopped: let the screen sleep again.
+            // Stopped: let the screen sleep again, and bank the mode
+            // thumbnails while the session's data is still warm.
             UIApplication.shared.isIdleTimerDisabled = running && !engine.isPaused
+            if !running { snapshotSwatches() }
         }
         .onChange(of: pictureInPicture) { enabled in
             pip.setEnabled(enabled)
@@ -256,9 +258,14 @@ struct ContentView: View {
             // button): the full app is showing, so the floating window is
             // redundant — dismiss it.
             if phase == .active { pip.dismissForForeground() }
-            // Leaving: persist the drive so it shows in the Routes list even if
-            // the process never comes back.
-            if phase == .background { engine.saveTrack() }
+            // Leaving (also the path a swipe-quit takes): persist the drive so
+            // it shows in the Routes list even if the process never comes
+            // back, and write out fresh mode thumbnails so the next launch's
+            // menu opens with end-of-drive art instead of stale cache.
+            if phase == .background {
+                engine.saveTrack()
+                snapshotSwatches()
+            }
         }
         .onReceive(engine.$lastCoordinate.compactMap { $0 }) { _ in
             // Warm the mode-menu thumbnails shortly after the first fix: by
@@ -270,11 +277,7 @@ struct ContentView: View {
             didPrerenderSwatches = true
             Task { @MainActor in
                 try? await Task.sleep(nanoseconds: 6_000_000_000)
-                _ = ModeSwatchCache.shared.refresh(
-                    track: engine.track,
-                    metric: engine.state.unitIsMetric,
-                    family: engine.state.appFont,
-                    light: engine.state.lightMode)
+                snapshotSwatches()
             }
         }
         .onDisappear {
@@ -408,6 +411,17 @@ struct ContentView: View {
         playback = TrackLog(saved: route)
         slopeSelected = nil
         slopeDragAnchor = nil
+    }
+
+    /// Render fresh mode thumbnails from current data and write them to the
+    /// cache (disk), so the next menu open — this session or the next — shows
+    /// real art. Called after the first fix, on Stop, and on backgrounding.
+    private func snapshotSwatches() {
+        _ = ModeSwatchCache.shared.refresh(
+            track: engine.track,
+            metric: engine.state.unitIsMetric,
+            family: engine.state.appFont,
+            light: engine.state.lightMode)
     }
 
     /// The readout to show: live, or — while scrubbing a Slope/Route trail — the
