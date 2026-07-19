@@ -504,6 +504,33 @@ enum BackgroundArtRenderer {
         for s in located where s.activeTime <= playhead { chosen = s }
         return (chosen ?? located.first).map(project)
     }
+
+    /// Screen points per meter at `zoom` — the same projection + fit drawRoute
+    /// lands on (keep the two formulas in sync). nil until the trail has a
+    /// located sample. Drives the app's transient pinch-zoom scale bar.
+    static func routePointsPerMeter(size: CGSize, samples: [TrackSample],
+                                    zoom: CGFloat) -> CGFloat? {
+        let located = samples.filter { $0.latitude != nil && $0.longitude != nil }
+        guard !located.isEmpty else { return nil }
+        let n = Double(located.count)
+        let lat0 = located.reduce(0.0) { $0 + $1.latitude! } / n
+        let lon0 = located.reduce(0.0) { $0 + $1.longitude! } / n
+        let mPerLat = 111_320.0
+        let mPerLon = mPerLat * cos(lat0 * .pi / 180)
+        var minX = CGFloat.greatestFiniteMagnitude, maxX = -CGFloat.greatestFiniteMagnitude
+        var minY = CGFloat.greatestFiniteMagnitude, maxY = -CGFloat.greatestFiniteMagnitude
+        for s in located {
+            let x = CGFloat((s.longitude! - lon0) * mPerLon)
+            let y = CGFloat(-(s.latitude! - lat0) * mPerLat)
+            minX = min(minX, x); maxX = max(maxX, x)
+            minY = min(minY, y); maxY = max(maxY, y)
+        }
+        let bboxW = max(maxX - minX, 1), bboxH = max(maxY - minY, 1)
+        let minSide = min(size.width, size.height)
+        let fitScale = min((size.width * 0.86) / bboxW, (size.height * 0.86) / bboxH,
+                           minSide / 40)
+        return fitScale * max(routeMinZoom, zoom)
+    }
 }
 
 /// Fractal value noise + marching squares = contour lines.

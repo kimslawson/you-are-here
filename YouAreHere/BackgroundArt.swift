@@ -437,6 +437,52 @@ struct RouteBackground: View {
     }
 }
 
+/// The transient scale bar shown while pinch-zooming Route: picks the largest
+/// "nice" round distance that fits ~110pt at the map's current points-per-meter
+/// and draws a tick-ended bar exactly that long, so bar length ↔ distance read
+/// together. Unit follows the distance setting.
+struct RouteScaleBar: View {
+    let pointsPerMeter: CGFloat
+    let metric: Bool
+
+    private static let metricOptions: [(String, Double)] = [
+        ("50 m", 50), ("100 m", 100), ("200 m", 200), ("500 m", 500),
+        ("1 km", 1_000), ("2 km", 2_000), ("5 km", 5_000), ("10 km", 10_000),
+        ("25 km", 25_000), ("50 km", 50_000), ("100 km", 100_000),
+    ]
+    private static let imperialOptions: [(String, Double)] = [
+        ("100 ft", 30.48), ("250 ft", 76.2), ("500 ft", 152.4), ("1000 ft", 304.8),
+        ("0.5 mi", 804.7), ("1 mi", 1_609.3), ("2 mi", 3_218.7), ("5 mi", 8_046.7),
+        ("10 mi", 16_093), ("25 mi", 40_234), ("50 mi", 80_467), ("100 mi", 160_934),
+    ]
+
+    var body: some View {
+        let options = metric ? Self.metricOptions : Self.imperialOptions
+        let pick = options.last { CGFloat($0.1) * pointsPerMeter <= 110 } ?? options[0]
+        let width = max(24, CGFloat(pick.1) * pointsPerMeter)
+        VStack(alignment: .leading, spacing: 3) {
+            Text(pick.0)
+                .font(.system(size: 11, weight: .medium))
+            ScaleBarShape()
+                .stroke(style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+                .frame(width: width, height: 6)
+        }
+        .foregroundColor(Theme.secondary)
+    }
+}
+
+/// ⊔ — a baseline with upturned end ticks.
+private struct ScaleBarShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        p.move(to: CGPoint(x: rect.minX, y: rect.minY))
+        p.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        p.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        p.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        return p
+    }
+}
+
 // Procedural has no data dependency, so it's the previewable one; real Topo
 // needs a fetch + the engine's coordinate.
 #Preview("Procedural") {

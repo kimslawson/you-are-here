@@ -31,6 +31,9 @@ struct ContentView: View {
     // committed at the last pinch's end (the base the live gesture multiplies).
     @State private var routeZoom: CGFloat = 1
     @State private var routeZoomBase: CGFloat = 1
+    // Transient scale bar: shown while pinching, fading ~2s after the pinch ends.
+    @State private var showZoomScale = false
+    @State private var zoomScaleHideTask: Task<Void, Never>?
     // Set once the engine has started, so the "Stopped" screen only shows after
     // an explicit Stop — not during the first frame before start() runs.
     @State private var didStart = false
@@ -124,6 +127,31 @@ struct ContentView: View {
                     .animation(.easeOut(duration: 0.25), value: engine.state)
                 }
 
+                // Transient zoom scale (Route only): top-leading, below the top
+                // line, while pinching + ~2s after. Sized against the full
+                // screen — the route canvas ignores the safe area, so its
+                // points-per-meter is computed on that geometry, not geo.size.
+                if showZoomScale, routeLayout {
+                    let full = CGSize(
+                        width: geo.size.width + geo.safeAreaInsets.leading + geo.safeAreaInsets.trailing,
+                        height: geo.size.height + geo.safeAreaInsets.top + geo.safeAreaInsets.bottom)
+                    if let ppm = BackgroundArtRenderer.routePointsPerMeter(
+                        size: full, samples: activeTrack.samples, zoom: routeZoom) {
+                        VStack {
+                            HStack {
+                                RouteScaleBar(pointsPerMeter: ppm,
+                                              metric: engine.state.unitIsMetric)
+                                    .padding(.leading, 28)
+                                    .padding(.top, 96)
+                                Spacer()
+                            }
+                            Spacer()
+                        }
+                        .transition(.opacity)
+                        .allowsHitTesting(false)
+                    }
+                }
+
                 // Control bezel: tap anywhere to summon Mode / Settings / Share /
                 // Routes, bottom-center where thumbs live; it fades out after a
                 // few seconds. No persistent chrome — the readout owns the screen.
@@ -206,6 +234,8 @@ struct ContentView: View {
             slopeDragAnchor = nil
             routeZoom = 1
             routeZoomBase = 1
+            showZoomScale = false
+            zoomScaleHideTask?.cancel()
         }
         .onChange(of: pipLargeWindow) { _ in
             // Next frame carries the new canvas; the window animates to match.
@@ -443,11 +473,23 @@ struct ContentView: View {
             .onChanged { scale in
                 guard BackgroundArt(rawValue: backgroundArt) == .route else { return }
                 routeZoom = clampZoom(routeZoomBase * scale)
+                // Show the scale bar while pinching; hold it while fingers move.
+                zoomScaleHideTask?.cancel()
+                if !showZoomScale {
+                    withAnimation(.easeIn(duration: 0.12)) { showZoomScale = true }
+                }
             }
             .onEnded { scale in
                 guard BackgroundArt(rawValue: backgroundArt) == .route else { return }
                 routeZoomBase = clampZoom(routeZoomBase * scale)
                 routeZoom = routeZoomBase
+                // Linger briefly so the final scale can be read, then fade.
+                zoomScaleHideTask?.cancel()
+                zoomScaleHideTask = Task {
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    guard !Task.isCancelled else { return }
+                    withAnimation(.easeOut(duration: 0.4)) { showZoomScale = false }
+                }
             }
     }
 
