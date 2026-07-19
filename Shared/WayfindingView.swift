@@ -341,20 +341,25 @@ struct SpeedLimitSign: View {
     var family: AppFont = .helvetica
 
     var body: some View {
-        VStack(spacing: height * 0.015) {
-            Text("SPEED").font(Theme.font(size: height * 0.15, weight: .semibold, family: family))
-            Text("LIMIT").font(Theme.font(size: height * 0.15, weight: .semibold, family: family))
+        // Proportioned after the real MUTCD R2-1 plate: legend fills the sign
+        // (4-in letters / 10-in numerals on a 30-in sign ≈ 0.18 / 0.48 of the
+        // height as point sizes) with tight, even margins. The bottom padding
+        // runs smaller than the top because the numeral's font box reserves
+        // descender room digits never use.
+        VStack(spacing: height * 0.01) {
+            Text("SPEED").font(Theme.font(size: height * 0.18, weight: .semibold, family: family))
+            Text("LIMIT").font(Theme.font(size: height * 0.18, weight: .semibold, family: family))
             Text("\(value)")
-                .font(Theme.font(size: height * 0.42, weight: .bold, family: family))
-                .padding(.top, height * 0.02)
+                .font(Theme.font(size: height * 0.48, weight: .bold, family: family))
         }
         .foregroundColor(color)
         .lineLimit(1)
         .minimumScaleFactor(0.5)
-        .padding(.horizontal, height * 0.14)
-        .padding(.vertical, height * 0.09)
+        .padding(.horizontal, height * 0.09)
+        .padding(.top, height * 0.055)
+        .padding(.bottom, height * 0.02)
         .background(
-            RoundedRectangle(cornerRadius: height * 0.10)
+            RoundedRectangle(cornerRadius: height * 0.08)
                 .stroke(color, lineWidth: max(1, height * 0.045))
         )
         .fixedSize()
